@@ -2,334 +2,497 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trending YouTube VN</title>
-    
-    <!-- Load Google Fonts (K2D & Readex Pro) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=K2D:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,700&family=Readex+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- Load React -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js" crossorigin="anonymous"></script>
-    
-    <!-- Load Tailwind CSS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hình Học Không Gian & AI Gia Sư</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Cấu hình Tailwind cho Font -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"Readex Pro"', 'sans-serif'],
-                        k2d: ['"K2D"', 'sans-serif'],
-                    }
-                }
-            }
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { font-family: 'Nunito', sans-serif; overflow: hidden; margin: 0; padding: 0; background: #000; touch-action: none; }
+        
+        #camera-feed { position: absolute; inset: 0; object-fit: cover; z-index: 0; display: none; }
+        #gradient-bg { position: absolute; inset: 0; background: radial-gradient(circle at center, #f0f9ff 0%, #e0f2fe 100%); z-index: 1; }
+        #canvas-container { position: absolute; inset: 0; z-index: 10; }
+        
+        /* Glass Effect */
+        .glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
-    </script>
+
+        /* Controls */
+        .ctrl-btn {
+            width: 44px; height: 44px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%; background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: all 0.2s; color: #475569;
+            cursor: pointer; border: 2px solid transparent; user-select: none;
+        }
+        .ctrl-btn:active { transform: scale(0.9); }
+        .ctrl-btn.active { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+        .ctrl-btn.ai-active { background: linear-gradient(135deg, #6366f1, #ec4899); color: white; border: none; }
+
+        /* Sidebar Transition */
+        #sidebar { transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1); }
+        .sidebar-open { transform: translateX(0); }
+        .sidebar-closed { transform: translateX(-100%); }
+
+        /* AI Panel Transition Logic */
+        #ai-panel { transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
+        .ai-mobile-closed { transform: translateY(120%); }
+        .ai-mobile-open { transform: translateY(0); }
+        @media (min-width: 768px) {
+            .ai-desktop-closed { transform: translate(-50%, 120%); }
+            .ai-desktop-open { transform: translate(-50%, 0); }
+        }
+
+        /* Chat */
+        .chat-msg { padding: 8px 12px; margin-bottom: 8px; font-size: 14px; line-height: 1.4; max-width: 85%; }
+        .msg-user { background: #3b82f6; color: white; border-radius: 16px 16px 4px 16px; margin-left: auto; }
+        .msg-ai { background: #f1f5f9; color: #1e293b; border-radius: 16px 16px 16px 4px; margin-right: auto; border: 1px solid #e2e8f0; }
+        .msg-ai strong { color: #4f46e5; font-weight: 700; }
+        
+        /* Loading */
+        .typing { display: flex; gap: 4px; padding: 4px 8px; background: #f1f5f9; border-radius: 12px; width: fit-content; }
+        .dot { width: 6px; height: 6px; background: #94a3b8; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
+        .dot:nth-child(1) { animation-delay: -0.32s; } .dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+    </style>
 </head>
-<body class="bg-[#0a0f1c] text-white font-sans selection:bg-red-500/30">
-    <div id="root">
-        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; color: #9ca3af; font-family: 'Readex Pro', sans-serif;">
-            Đang khởi tạo ứng dụng...
+<body class="text-slate-800">
+
+    <!-- Audio Player (Single Default Source) -->
+    <audio id="bg-music" loop>
+        <source src="https://commondatastorage.googleapis.com/codeskulptor-assets/Epoq-Lepidoptera.ogg" type="audio/ogg">
+    </audio>
+
+    <video id="camera-feed" autoplay muted playsinline></video>
+    <div id="gradient-bg"></div>
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay -->
+    <div class="absolute inset-0 pointer-events-none z-50 flex flex-col justify-between">
+        
+        <!-- TOP BAR -->
+        <div class="flex justify-between items-start p-4 pointer-events-auto z-[60]">
+            <!-- Left: Menu Toggle -->
+            <button onclick="toggleSidebar()" class="ctrl-btn" id="btn-menu">
+                <svg id="icon-menu-open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                <svg id="icon-menu-close" class="w-6 h-6 hidden text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+
+            <!-- Right: Controls -->
+            <div class="flex gap-3">
+                <button id="btn-music" onclick="toggleMusic()" class="ctrl-btn" title="Bật/Tắt Nhạc">
+                    <svg id="icon-music-off" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+                    <svg id="icon-music-on" class="w-6 h-6 hidden text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                </button>
+                
+                <button id="btn-camera" onclick="toggleCamera()" class="ctrl-btn" title="Camera AR">
+                    <svg id="icon-cam-off" class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                    <svg id="icon-cam-on" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                </button>
+
+                <button onclick="resetView()" class="ctrl-btn" title="Đặt lại góc nhìn">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
+
+                <button id="btn-ai" onclick="toggleAI()" class="ctrl-btn" title="Gia Sư AI">
+                    <svg id="icon-ai-open" class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <svg id="icon-ai-close" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Sidebar (Left) -->
+        <div id="sidebar" class="absolute top-0 left-0 h-full w-64 glass sidebar-closed flex flex-col pt-20 px-4 pb-4 pointer-events-auto z-40 shadow-2xl">
+            <h2 class="text-xl font-bold text-blue-600 mb-2 flex items-center">📚 Thư Viện Hình</h2>
+            <div id="menu-list" class="flex-shrink-0 space-y-2 mb-2 overflow-y-auto h-full pr-1 custom-scrollbar"></div>
+        </div>
+
+        <!-- Info Panel (Top Right - Below Controls) -->
+        <div id="info-card" class="absolute top-20 right-4 w-64 glass rounded-xl p-4 shadow-lg pointer-events-auto hidden transition-opacity z-30">
+            <h3 id="info-title" class="font-bold text-lg text-blue-700">--</h3>
+            <p id="info-desc" class="text-sm text-slate-600 mb-2">--</p>
+            <div class="bg-blue-50 p-2 rounded border border-blue-100 mb-2">
+                <span class="text-xs font-bold text-blue-500 uppercase block">Chi tiết:</span>
+                <span id="info-part" class="font-bold text-slate-800">--</span>
+                <p id="info-part-desc" class="text-xs text-slate-600">--</p>
+            </div>
+            <button onclick="document.getElementById('info-card').classList.add('hidden')" class="text-xs text-center w-full text-slate-400 hover:text-red-500 mt-1">Đóng</button>
+        </div>
+
+        <!-- AI Chat Panel (Bottom) -->
+        <div id="ai-panel" class="w-full md:w-[400px] h-[55vh] md:h-[500px] glass rounded-t-2xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] flex flex-col pointer-events-auto absolute bottom-0 left-0 md:left-1/2 z-50 ai-mobile-closed md:ai-desktop-closed">
+            <!-- Header -->
+            <div class="p-3 border-b border-gray-100 flex items-center justify-between bg-white/50 rounded-t-2xl cursor-pointer" onclick="toggleAI()">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-white shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                    </div>
+                    <span class="font-bold text-slate-800">Gia Sư AI</span>
+                </div>
+                <button class="text-slate-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></button>
+            </div>
+
+            <!-- Chat Content -->
+            <div id="chat-box" class="flex-1 overflow-y-auto p-4 bg-white/40">
+                <div class="msg-ai chat-msg">Chào bạn! Mình có thể giúp gì về hình học không? ✨</div>
+            </div>
+
+            <!-- Suggestions -->
+            <div class="px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar border-t border-white/50 bg-white/60">
+                <button onclick="askAI('Đố vui về hình này!')" class="whitespace-nowrap px-3 py-1 bg-white border border-pink-100 rounded-full text-xs font-semibold text-pink-600 hover:bg-pink-50 shadow-sm">❓ Đố vui</button>
+                <button onclick="askAI('Công thức tính diện tích?')" class="whitespace-nowrap px-3 py-1 bg-white border border-indigo-100 rounded-full text-xs font-semibold text-indigo-600 hover:bg-indigo-50 shadow-sm">📏 Công thức</button>
+                <button onclick="askAI('Ứng dụng thực tế?')" class="whitespace-nowrap px-3 py-1 bg-white border border-green-100 rounded-full text-xs font-semibold text-green-600 hover:bg-green-50 shadow-sm">🌍 Thực tế</button>
+            </div>
+
+            <!-- Input -->
+            <div class="p-3 bg-white border-t border-gray-100">
+                <div class="flex gap-2">
+                    <input type="text" id="ai-input" placeholder="Nhập câu trả lời hoặc câu hỏi..." class="flex-1 px-4 py-2.5 rounded-full bg-gray-100 border-none text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" onkeypress="if(event.key==='Enter') askAI(this.value)">
+                    <button onclick="askAI(document.getElementById('ai-input').value)" class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow hover:bg-indigo-700 transition">
+                        <svg class="w-5 h-5 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <script type="text/babel" data-presets="react,env">
-        const { useState, useEffect, useRef, useCallback } = React;
+    <script>
+        const apiKey = ""; 
 
-        // ==========================================
-        // QUAN TRỌNG: DÁN API KEY CỦA BẠN VÀO ĐÂY
-        // ==========================================
-        const YOUTUBE_API_KEY = "AIzaSyDVA2MLzQeEs-D0Mg6whtEgGsVMF76XDOY"; 
+        // --- AUDIO MANAGER ---
+        let isMusic = false;
+        const audio = document.getElementById('bg-music');
         
-        // Icon Components
-        const PlayIcon = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="6 3 20 12 6 21 6 3"/></svg>;
-        const XIcon = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
-        const YoutubeIcon = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2.5 7.1C2.6 5.9 3.4 5.1 4.5 5 8.1 4.7 12 4.7 15.5 5c1.1.1 1.9.9 2 2.1.2 1.6.2 3.2 0 4.8-.1 1.2-.9 2-2 2.1-3.5.3-7.4.3-11 .1-1.1-.1-1.9-.9-2-2.1-.2-1.6-.2-3.2 0-4.8Z"/><path fill="white" stroke="white" d="m9.5 14.5 6-4-6-4v8Z"/></svg>;
-
-        const formatViews = (views) => {
-            if (!views) return "0";
-            const num = parseInt(views);
-            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-            if (num >= 1000) return (num / 1000).toFixed(0) + 'K';
-            return num.toString();
-        };
-
-        const timeSince = (dateString) => {
-            const date = new Date(dateString);
-            const seconds = Math.floor((new Date() - date) / 1000);
-            let interval = seconds / 31536000;
-            if (interval > 1) return Math.floor(interval) + " năm trước";
-            interval = seconds / 2592000;
-            if (interval > 1) return Math.floor(interval) + " tháng trước";
-            interval = seconds / 86400;
-            if (interval > 1) return Math.floor(interval) + " ngày trước";
-            interval = seconds / 3600;
-            if (interval > 1) return Math.floor(interval) + " giờ trước";
-            interval = seconds / 60;
-            if (interval > 1) return Math.floor(interval) + " phút trước";
-            return Math.floor(seconds) + " giây trước";
-        };
-
-        function App() {
-            const [activeTab, setActiveTab] = useState('all');
-            const [videos, setVideos] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [loadingMore, setLoadingMore] = useState(false);
-            const [error, setError] = useState(null);
-            const [playingVideo, setPlayingVideo] = useState(null);
-            const [nextPageToken, setNextPageToken] = useState(null);
+        function toggleMusic() {
+            const btn = document.getElementById('btn-music');
+            isMusic = !isMusic;
             
-            // Dùng ref để chống lỗi stale state (trạng thái cũ) khi cuộn
-            const tokenRef = useRef(null);
-            const loadingMoreRef = useRef(false);
-            const observerTarget = useRef(null);
-
-            const categories = {
-                'all': '',
-                'music': '10',
-                'news': '25',
-                'entertainment': '24'
-            };
-
-            const tabs = [
-                { id: 'all', label: 'TỔNG HỢP' },
-                { id: 'music', label: 'ÂM NHẠC' },
-                { id: 'news', label: 'TIN TỨC' },
-                { id: 'entertainment', label: 'GIẢI TRÍ' },
-            ];
-
-            const fetchTrending = async (isLoadMore = false) => {
-                if (isLoadMore) {
-                    if (!tokenRef.current || loadingMoreRef.current) return;
-                    setLoadingMore(true);
-                    loadingMoreRef.current = true;
-                } else {
-                    setLoading(true);
-                    setVideos([]);
-                    setNextPageToken(null);
-                    tokenRef.current = null;
-                }
-                setError(null);
-
-                if (YOUTUBE_API_KEY === "DÁN_API_KEY_CỦA_BẠN_VÀO_ĐÂY" || !YOUTUBE_API_KEY) {
-                    setError("Vui lòng nhập YOUTUBE_API_KEY hợp lệ.");
-                    setLoading(false);
-                    return;
-                }
-
-                try {
-                    const categoryParam = categories[activeTab] ? `&videoCategoryId=${categories[activeTab]}` : '';
-                    const tokenParam = (isLoadMore && tokenRef.current) ? `&pageToken=${tokenRef.current}` : '';
-                    
-                    // Nâng maxResults lên 50 (mức tối đa của YouTube) để lấy nhiều nhất có thể mỗi lần
-                    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=VN&maxResults=50${categoryParam}${tokenParam}&key=${YOUTUBE_API_KEY}`;
-                    
-                    const response = await fetch(url);
-                    const data = await response.json();
-
-                    if (data.error) throw new Error(data.error.message);
-
-                    const formattedVideos = data.items.map(item => ({
-                        // Đảm bảo ID duy nhất cho React Key kể cả khi YouTube trả trùng lặp ở biên trang
-                        uniqueKey: item.id + '-' + Math.random().toString(36).substr(2, 9),
-                        youtubeId: item.id,
-                        title: item.snippet.title,
-                        channel: item.snippet.channelTitle,
-                        views: formatViews(item.statistics.viewCount),
-                        timeAgo: timeSince(item.snippet.publishedAt),
-                        thumbnail: item.snippet.thumbnails.maxres?.url || item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url
-                    }));
-
-                    if (isLoadMore) {
-                        setVideos(prev => [...prev, ...formattedVideos]);
-                    } else {
-                        setVideos(formattedVideos);
-                    }
-                    
-                    const nextToken = data.nextPageToken || null;
-                    setNextPageToken(nextToken);
-                    tokenRef.current = nextToken;
-
-                } catch (err) {
-                    setError("Lỗi lấy dữ liệu: " + err.message);
-                } finally {
-                    setLoading(false);
-                    setLoadingMore(false);
-                    loadingMoreRef.current = false;
-                }
-            };
-
-            // Gọi API khi đổi Tab
-            useEffect(() => {
-                fetchTrending(false);
-            }, [activeTab]);
-
-            // Thiết lập Intersection Observer để cuộn vô hạn
-            useEffect(() => {
-                const observer = new IntersectionObserver(
-                    entries => {
-                        // Nếu thẻ div ở cuối trang xuất hiện vào khung hình -> Tải thêm
-                        if (entries[0].isIntersecting && tokenRef.current && !loadingMoreRef.current) {
-                            fetchTrending(true);
-                        }
-                    },
-                    { threshold: 0.1 }
-                );
-
-                if (observerTarget.current) {
-                    observer.observe(observerTarget.current);
-                }
-
-                return () => {
-                    if (observerTarget.current) observer.unobserve(observerTarget.current);
-                };
-            }, [activeTab]); // Reset observer mỗi khi đổi tab
-
-            return (
-                <div className="pb-10">
-                    <header className="sticky top-0 z-40 bg-[#111827] border-b border-gray-800 shadow-lg py-3">
-                        <div className="max-w-6xl mx-auto px-4 flex items-center">
-                            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => {setActiveTab('all');}}>
-                                <YoutubeIcon size={42} className="text-red-500 group-hover:scale-105 transition-transform" />
-                                <div className="flex flex-col">
-                                    <span className="font-bold text-xl tracking-tight text-white leading-tight font-k2d">Trending YouTube</span>
-                                    <span className="text-xs text-gray-400 font-medium">Xu hướng YouTube Việt Nam</span>
-                                </div>
-                            </div>
-                        </div>
-                    </header>
-
-                    <main className="max-w-6xl mx-auto px-4 py-6">
-                        {/* Tabs */}
-                        <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide mb-4 border-b border-gray-800">
-                            {tabs.map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`whitespace-nowrap px-5 py-2.5 rounded-lg font-bold text-sm transition-all duration-200 font-k2d tracking-wide ${
-                                        activeTab === tab.id 
-                                            ? 'bg-red-600 text-white shadow-lg shadow-red-500/20' 
-                                            : 'bg-[#1e293b] text-gray-400 hover:bg-gray-700 hover:text-white'
-                                    }`}
-                                >
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Status Messages */}
-                        {loading && <div className="text-center py-20 text-gray-400 font-medium animate-pulse">Đang tải dữ liệu từ YouTube...</div>}
-                        {error && (
-                            <div className="bg-red-900/50 border border-red-500 text-red-200 p-6 rounded-lg text-center max-w-2xl mx-auto mt-10">
-                                <h3 className="font-bold text-lg mb-2 font-k2d">⚠️ Lỗi kết nối API</h3>
-                                <p>{error}</p>
-                            </div>
-                        )}
-
-                        {/* Video List */}
-                        {!loading && !error && (
-                            <div className="bg-[#111827] rounded-xl border border-gray-800 overflow-hidden shadow-xl">
-                                <div className="grid grid-cols-[50px_1fr] sm:grid-cols-[70px_1fr] gap-4 p-4 border-b border-gray-800 bg-[#0f1523] text-xs font-semibold text-gray-500 tracking-wider">
-                                    <div className="text-center">HẠNG</div>
-                                    <div>NỘI DUNG THỰC TẾ</div>
-                                </div>
-                                
-                                <div className="divide-y divide-gray-800/50">
-                                    {videos.map((video, index) => {
-                                        const rankColor = index < 3 ? 'text-red-500' : 'text-gray-500';
-                                        
-                                        return (
-                                            <div 
-                                                key={video.uniqueKey} 
-                                                onClick={() => setPlayingVideo(video)}
-                                                className="grid grid-cols-[50px_1fr] sm:grid-cols-[70px_1fr] gap-2 sm:gap-4 p-4 sm:p-5 hover:bg-[#1e293b]/60 transition-colors cursor-pointer group items-center"
-                                            >
-                                                {/* Khu vực Đánh số (Chỉ hiển thị Top 20) */}
-                                                <div className="text-center flex justify-center items-center">
-                                                    {index < 20 ? (
-                                                        <span className={`text-3xl sm:text-4xl font-black italic font-k2d ${rankColor}`}>
-                                                            {index + 1}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-gray-700/50 font-black text-xl">-</span>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex flex-col sm:flex-row gap-4">
-                                                    <div className="relative w-full sm:w-56 aspect-video rounded-lg overflow-hidden shrink-0 bg-gray-800 border border-gray-700">
-                                                        <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"/>
-                                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors" />
-                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <div className="bg-red-600/90 text-white p-3 rounded-full backdrop-blur-sm shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
-                                                                <PlayIcon size={20} className="ml-1" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex flex-col justify-center flex-1 min-w-0 py-1">
-                                                        <h3 className="text-sm sm:text-base font-bold text-gray-100 mb-2 line-clamp-2 group-hover:text-red-400 transition-colors leading-snug font-k2d">
-                                                            {video.title}
-                                                        </h3>
-                                                        <p className="text-gray-400 text-xs sm:text-sm font-medium mb-1">{video.channel}</p>
-                                                        <div className="flex items-center gap-2 text-[11px] sm:text-xs text-gray-500">
-                                                            <span>{video.views} lượt xem</span>
-                                                            <span>•</span>
-                                                            <span>{video.timeAgo}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-                        
-                        {/* Loading Spinner cho chế độ cuộn vô hạn */}
-                        <div ref={observerTarget} className="py-6 flex justify-center">
-                            {loadingMore && (
-                                <div className="text-gray-400 animate-pulse font-medium text-sm flex items-center gap-2">
-                                    <svg className="animate-spin h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                    Đang tải thêm nội dung...
-                                </div>
-                            )}
-                        </div>
-                    </main>
-
-                    {/* Modal Player */}
-                    {playingVideo && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/95 backdrop-blur-sm">
-                            <button onClick={() => setPlayingVideo(null)} className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 bg-gray-800 hover:bg-red-600 text-white rounded-full transition-colors z-50">
-                                <XIcon size={24} />
-                            </button>
-                            <div className="w-full max-w-5xl bg-black rounded-xl overflow-hidden shadow-2xl border border-gray-800">
-                                <div className="relative w-full aspect-video bg-gray-900">
-                                    <iframe className="absolute top-0 left-0 w-full h-full" src={`https://www.youtube.com/embed/${playingVideo.youtubeId}?autoplay=1`} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-                                </div>
-                                <div className="p-4 sm:p-6 bg-[#111827]">
-                                    <h2 className="text-lg sm:text-xl font-bold text-white mb-2 line-clamp-2 font-k2d">{playingVideo.title}</h2>
-                                    <div className="flex items-center gap-3">
-                                        <div>
-                                            <p className="font-semibold text-gray-200">{playingVideo.channel}</p>
-                                            <p className="text-xs text-gray-400">{playingVideo.views} lượt xem</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
+            if (isMusic) {
+                audio.volume = 0.4;
+                audio.play().catch(e => {
+                    alert("Vui lòng chạm vào màn hình trước khi phát nhạc!");
+                    isMusic = false;
+                });
+                btn.classList.add('active');
+                document.getElementById('icon-music-off').classList.add('hidden');
+                document.getElementById('icon-music-on').classList.remove('hidden');
+            } else {
+                audio.pause();
+                btn.classList.remove('active');
+                document.getElementById('icon-music-off').classList.remove('hidden');
+                document.getElementById('icon-music-on').classList.add('hidden');
+            }
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        // --- CORE LOGIC ---
+        let isAiOpen = false;
+        let isMenuOpen = false;
+        let isCamera = false;
+        let currentShape = 'cube';
+        let chatHistoryLog = []; 
+
+        window.toggleAI = function() {
+            const panel = document.getElementById('ai-panel');
+            const btn = document.getElementById('btn-ai');
+            const iconOpen = document.getElementById('icon-ai-open');
+            const iconClose = document.getElementById('icon-ai-close');
+
+            isAiOpen = !isAiOpen;
+            
+            panel.classList.remove('ai-mobile-closed', 'ai-mobile-open', 'ai-desktop-closed', 'ai-desktop-open');
+            
+            if (isAiOpen) {
+                panel.classList.add('ai-mobile-open');
+                panel.classList.add('ai-desktop-open'); 
+                
+                btn.classList.add('ai-active');
+                iconOpen.classList.add('hidden');
+                iconClose.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    const input = document.getElementById('ai-input');
+                    if(window.innerWidth > 768) input.focus();
+                }, 300);
+            } else {
+                panel.classList.add('ai-mobile-closed');
+                panel.classList.add('ai-desktop-closed');
+                
+                btn.classList.remove('ai-active');
+                iconOpen.classList.remove('hidden');
+                iconClose.classList.add('hidden');
+                document.getElementById('ai-input').blur();
+            }
+        };
+
+        window.toggleSidebar = function() {
+            const sb = document.getElementById('sidebar');
+            const iconOpen = document.getElementById('icon-menu-open');
+            const iconClose = document.getElementById('icon-menu-close');
+            
+            isMenuOpen = !isMenuOpen;
+            
+            if (isMenuOpen) {
+                sb.classList.remove('sidebar-closed');
+                sb.classList.add('sidebar-open');
+                iconOpen.classList.add('hidden');
+                iconClose.classList.remove('hidden');
+            } else {
+                sb.classList.remove('sidebar-open');
+                sb.classList.add('sidebar-closed');
+                iconOpen.classList.remove('hidden');
+                iconClose.classList.add('hidden');
+            }
+        };
+
+        window.toggleCamera = async function() {
+            const vid = document.getElementById('camera-feed');
+            const grad = document.getElementById('gradient-bg');
+            const btn = document.getElementById('btn-camera');
+            
+            if (!isCamera) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    vid.srcObject = stream;
+                    vid.style.display = 'block';
+                    grad.style.opacity = '0';
+                    btn.classList.add('active');
+                    document.getElementById('icon-cam-off').classList.add('hidden');
+                    document.getElementById('icon-cam-on').classList.remove('hidden');
+                    isCamera = true;
+                } catch (e) { alert("Không thể mở Camera: " + e.message); }
+            } else {
+                const tracks = vid.srcObject?.getTracks();
+                if (tracks) tracks.forEach(t => t.stop());
+                vid.style.display = 'none';
+                grad.style.opacity = '1';
+                btn.classList.remove('active');
+                document.getElementById('icon-cam-off').classList.remove('hidden');
+                document.getElementById('icon-cam-on').classList.add('hidden');
+                isCamera = false;
+            }
+        };
+
+        // --- 2. THREE.JS SCENE ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(6, 6, 8);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lights
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
+
+        // Raycaster
+        const raycaster = new THREE.Raycaster();
+        let currentMesh = null;
+
+        // --- 3. SHAPE DATA & LOGIC ---
+        const SHAPES = {
+            cube: { name: "Hình Lập Phương", create: () => new THREE.BoxGeometry(3,3,3), color: 0x3b82f6, desc: "6 mặt hình vuông đều nhau." },
+            box: { name: "Hình Hộp CN", create: () => new THREE.BoxGeometry(3,4,2), color: 0x10b981, desc: "Các mặt đối diện bằng nhau." },
+            cylinder: { name: "Hình Trụ", create: () => new THREE.CylinderGeometry(1.5,1.5,4,32), color: 0xf59e0b, desc: "Hai đáy là hình tròn." },
+            cone: { name: "Hình Nón", create: () => new THREE.ConeGeometry(2,4,32), color: 0xef4444, desc: "Đáy tròn, đỉnh nhọn." },
+            pyramid: { name: "Hình Chóp", create: () => { const g=new THREE.CylinderGeometry(0,2.5,3.5,4,1); g.rotateY(Math.PI/4); return g; }, color: 0x8b5cf6, desc: "Đáy vuông, mặt bên tam giác." },
+            prism: { name: "Lăng Trụ Tam Giác", create: () => new THREE.CylinderGeometry(2,2,4,3), color: 0xec4899, desc: "Hai đáy tam giác song song." },
+            sphere: { name: "Hình Cầu", create: () => new THREE.SphereGeometry(2.2,32,32), color: 0xf472b6, desc: "Tập hợp điểm cách đều tâm." },
+            hex_prism: { name: "Lăng Trụ Lục Giác", create: () => new THREE.CylinderGeometry(2,2,4,6), color: 0x2dd4bf, desc: "Hai đáy hình lục giác." },
+            tetrahedron: { name: "Hình Tứ Diện", create: () => new THREE.TetrahedronGeometry(2.5), color: 0xfacc15, desc: "4 mặt tam giác đều." }
+        };
+
+        window.loadShape = function(key) {
+            currentShape = key;
+            const data = SHAPES[key];
+            
+            chatHistoryLog = []; 
+            document.getElementById('chat-box').innerHTML = '<div class="msg-ai chat-msg">Chào bạn! Mình có thể giúp gì về ' + data.name + ' không? ✨</div>';
+
+            if (currentMesh) {
+                scene.remove(currentMesh);
+                currentMesh.geometry.dispose();
+                currentMesh.material.dispose();
+            }
+
+            const mat = new THREE.MeshPhongMaterial({ 
+                color: data.color, shininess: 80, transparent: true, opacity: 0.9, side: THREE.DoubleSide 
+            });
+            currentMesh = new THREE.Mesh(data.create(), mat);
+            
+            const edges = new THREE.LineSegments(
+                new THREE.EdgesGeometry(currentMesh.geometry), 
+                new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 })
+            );
+            currentMesh.add(edges);
+            scene.add(currentMesh);
+
+            currentMesh.scale.set(0,0,0);
+            let s = 0;
+            const anim = setInterval(() => {
+                s += 0.1;
+                if (s >= 1) { currentMesh.scale.set(1,1,1); clearInterval(anim); }
+                else currentMesh.scale.set(s,s,s);
+            }, 16);
+
+            document.getElementById('info-title').innerText = data.name;
+            document.getElementById('info-desc').innerText = data.desc;
+            
+            if (window.innerWidth < 768) {
+                isMenuOpen = true; 
+                toggleSidebar();
+            }
+        };
+
+        window.resetView = function() {
+            controls.reset();
+            camera.position.set(6, 6, 8);
+        };
+
+        // --- 4. INTERACTION ---
+        function checkIntersection(x, y) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((x - rect.left) / rect.width) * 2 - 1,
+                -((y - rect.top) / rect.height) * 2 + 1
+            );
+            raycaster.setFromCamera(mouse, camera);
+            return raycaster.intersectObject(currentMesh);
+        }
+
+        let downX, downY;
+        container.addEventListener('pointerdown', e => { downX = e.clientX; downY = e.clientY; });
+        container.addEventListener('pointerup', e => {
+            const dist = Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY);
+            if (dist < 5) { 
+                const intersects = checkIntersection(e.clientX, e.clientY);
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    const normal = hit.face.normal;
+                    let partName = "Mặt Bên";
+                    let partDesc = "Các mặt bao quanh hình.";
+                    
+                    if (Math.abs(normal.y) > 0.8) {
+                        partName = "Mặt Đáy";
+                        partDesc = "Mặt phẳng trên hoặc dưới.";
+                    }
+                    if (currentShape === 'sphere') {
+                        partName = "Mặt Cầu"; partDesc = "Bề mặt cong khép kín.";
+                    }
+
+                    document.getElementById('info-card').classList.remove('hidden');
+                    document.getElementById('info-part').innerText = partName;
+                    document.getElementById('info-part-desc').innerText = partDesc;
+
+                    const oldHex = currentMesh.material.color.getHex();
+                    currentMesh.material.color.setHex(0xffff00);
+                    setTimeout(() => currentMesh.material.color.setHex(oldHex), 300);
+                } else {
+                    document.getElementById('info-card').classList.add('hidden');
+                }
+            }
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- 5. AI CHAT ---
+        const chatBox = document.getElementById('chat-box');
+        
+        window.askAI = async function(prompt) {
+            if (!prompt) return;
+            const input = document.getElementById('ai-input');
+            input.value = '';
+
+            const uDiv = document.createElement('div');
+            uDiv.className = 'msg-user chat-msg';
+            uDiv.innerText = prompt;
+            chatBox.appendChild(uDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const lDiv = document.createElement('div');
+            lDiv.className = 'msg-ai chat-msg typing';
+            lDiv.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+            chatBox.appendChild(lDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const shapeName = SHAPES[currentShape].name;
+                
+                const sysPrompt = `Bạn là Gia Sư AI toán học thân thiện dành cho học sinh Việt Nam. 
+                Ngữ cảnh: Học sinh đang quan sát mô hình 3D của: ${shapeName}.
+                
+                Nhiệm vụ của bạn:
+                1. Nếu học sinh hỏi kiến thức: Giải thích ngắn gọn (<50 từ), dễ hiểu, dùng emoji vui nhộn.
+                2. Nếu học sinh yêu cầu "Đố vui", "Câu đố", hoặc "Kiểm tra": Hãy tạo ra MỘT câu hỏi trắc nghiệm (có các lựa chọn A, B, C, D) hoặc một câu hỏi tự luận ngắn liên quan đến ${shapeName}. 
+                QUAN TRỌNG: KHÔNG ĐƯỢC đưa ra đáp án ngay lập tức. Hãy đặt câu hỏi và chờ học sinh trả lời ở lượt sau.
+                3. Nếu học sinh đang trả lời câu hỏi trước đó: Hãy nhận xét đúng/sai và giải thích ngắn gọn.
+                
+                Hãy giữ giọng điệu khích lệ và vui vẻ.`;
+                
+                chatHistoryLog.push({ role: "user", parts: [{ text: `Học sinh hỏi về ${shapeName}: "${prompt}"` }] });
+
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        contents: chatHistoryLog,
+                        systemInstruction: { parts: [{ text: sysPrompt }] }
+                    })
+                });
+                
+                const data = await res.json();
+                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Lỗi kết nối AI.";
+                
+                chatHistoryLog.push({ role: "model", parts: [{ text: reply }] });
+                
+                lDiv.className = 'msg-ai chat-msg';
+                lDiv.innerHTML = marked.parse(reply);
+                
+            } catch (err) {
+                lDiv.innerText = "Hệ thống đang bận, thử lại sau nhé!";
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        };
+
+        // --- 6. INIT ---
+        const menuList = document.getElementById('menu-list');
+        for (let key in SHAPES) {
+            const btn = document.createElement('div');
+            btn.className = "p-3 mb-2 bg-white rounded-lg shadow-sm border border-slate-100 cursor-pointer hover:bg-blue-50 transition font-semibold text-slate-700";
+            btn.innerText = SHAPES[key].name;
+            btn.onclick = () => loadShape(key);
+            menuList.appendChild(btn);
+        }
+        
+        loadShape('cube');
     </script>
 </body>
 </html>
+
+
