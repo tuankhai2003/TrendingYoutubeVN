@@ -1,498 +1,333 @@
+```html
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Hình Học Không Gian & AI Gia Sư</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô Hình AR - Đã Fix Kích Thước & Giao Diện AR</title>
     <style>
-        body { font-family: 'Nunito', sans-serif; overflow: hidden; margin: 0; padding: 0; background: #000; touch-action: none; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* Màu nền mặc định khi ở chế độ 3D máy tính */
+            background-color: #1a1a1a; 
+            transition: background-color 0.3s ease;
+        }
+        /* KHI VÀO AR: Bắt buộc nền phải trong suốt để thấy Camera */
+        body.in-ar {
+            background-color: transparent !important;
+        }
         
-        #camera-feed { position: absolute; inset: 0; object-fit: cover; z-index: 0; display: none; }
-        #gradient-bg { position: absolute; inset: 0; background: radial-gradient(circle at center, #f0f9ff 0%, #e0f2fe 100%); z-index: 1; }
-        #canvas-container { position: absolute; inset: 0; z-index: 10; }
-        
-        /* Glass Effect */
-        .glass {
+        #ui-panel {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            z-index: 1000;
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
-
-        /* Controls */
-        .ctrl-btn {
-            width: 44px; height: 44px;
-            display: flex; align-items: center; justify-content: center;
-            border-radius: 50%; background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            transition: all 0.2s; color: #475569;
-            cursor: pointer; border: 2px solid transparent; user-select: none;
+        .control-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        .ctrl-btn:active { transform: scale(0.9); }
-        .ctrl-btn.active { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
-        .ctrl-btn.ai-active { background: linear-gradient(135deg, #6366f1, #ec4899); color: white; border: none; }
-
-        /* Sidebar Transition */
-        #sidebar { transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1); }
-        .sidebar-open { transform: translateX(0); }
-        .sidebar-closed { transform: translateX(-100%); }
-
-        /* AI Panel Transition Logic */
-        #ai-panel { transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
-        .ai-mobile-closed { transform: translateY(120%); }
-        .ai-mobile-open { transform: translateY(0); }
-        @media (min-width: 768px) {
-            .ai-desktop-closed { transform: translate(-50%, 120%); }
-            .ai-desktop-open { transform: translate(-50%, 0); }
+        .control-group label {
+            font-weight: bold;
+            color: #333;
+            width: 70px;
+            font-size: 14px;
         }
-
-        /* Chat */
-        .chat-msg { padding: 8px 12px; margin-bottom: 8px; font-size: 14px; line-height: 1.4; max-width: 85%; }
-        .msg-user { background: #3b82f6; color: white; border-radius: 16px 16px 4px 16px; margin-left: auto; }
-        .msg-ai { background: #f1f5f9; color: #1e293b; border-radius: 16px 16px 16px 4px; margin-right: auto; border: 1px solid #e2e8f0; }
-        .msg-ai strong { color: #4f46e5; font-weight: 700; }
+        .control-group input[type="range"] {
+            flex-grow: 1;
+            margin: 0 10px;
+        }
+        .control-group .value-display {
+            width: 30px;
+            text-align: right;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        #valX { color: #ff0000; }
+        #valY { color: #00aa00; }
+        #valZ { color: #0000ff; }
+        hr { border: none; border-top: 1px solid #ddd; margin: 5px 0; }
         
-        /* Loading */
-        .typing { display: flex; gap: 4px; padding: 4px 8px; background: #f1f5f9; border-radius: 12px; width: fit-content; }
-        .dot { width: 6px; height: 6px; background: #94a3b8; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
-        .dot:nth-child(1) { animation-delay: -0.32s; } .dot:nth-child(2) { animation-delay: -0.16s; }
-        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        #instruction {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.6);
+            padding: 12px;
+            border-radius: 8px;
+            pointer-events: none;
+            font-size: 14px;
+            line-height: 1.5;
+            z-index: 1000;
+        }
+        /* Ẩn bảng hướng dẫn khi vào AR cho gọn màn hình */
+        body.in-ar #instruction {
+            display: none;
+        }
     </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
 </head>
-<body class="text-slate-800">
+<body>
 
-    <!-- Audio Player (Single Default Source) -->
-    <audio id="bg-music" loop>
-        <source src="https://commondatastorage.googleapis.com/codeskulptor-assets/Epoq-Lepidoptera.ogg" type="audio/ogg">
-    </audio>
+    <div id="instruction">
+        👉 Dùng chuột để xoay / phóng to.<br>
+        👉 Bấm <b>"ENTER AR"</b> để xem ngoài đời thực.<br>
+        <i>(Mô hình sẽ tự động xuất hiện phía trước bạn 1 mét)</i>
+    </div>
 
-    <video id="camera-feed" autoplay muted playsinline></video>
-    <div id="gradient-bg"></div>
-    <div id="canvas-container"></div>
-
-    <!-- UI Overlay -->
-    <div class="absolute inset-0 pointer-events-none z-50 flex flex-col justify-between">
-        
-        <!-- TOP BAR -->
-        <div class="flex justify-between items-start p-4 pointer-events-auto z-[60]">
-            <!-- Left: Menu Toggle -->
-            <button onclick="toggleSidebar()" class="ctrl-btn" id="btn-menu">
-                <svg id="icon-menu-open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                <svg id="icon-menu-close" class="w-6 h-6 hidden text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-
-            <!-- Right: Controls -->
-            <div class="flex gap-3">
-                <button id="btn-music" onclick="toggleMusic()" class="ctrl-btn" title="Bật/Tắt Nhạc">
-                    <svg id="icon-music-off" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
-                    <svg id="icon-music-on" class="w-6 h-6 hidden text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
-                </button>
-                
-                <button id="btn-camera" onclick="toggleCamera()" class="ctrl-btn" title="Camera AR">
-                    <svg id="icon-cam-off" class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
-                    <svg id="icon-cam-on" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                </button>
-
-                <button onclick="resetView()" class="ctrl-btn" title="Đặt lại góc nhìn">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                </button>
-
-                <button id="btn-ai" onclick="toggleAI()" class="ctrl-btn" title="Gia Sư AI">
-                    <svg id="icon-ai-open" class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    <svg id="icon-ai-close" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
+    <div id="ui-panel">
+        <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">Điều chỉnh kích thước (1-10)</div>
+        <div class="control-group">
+            <label style="color: red;">Trục X:</label>
+            <input type="range" id="sizeX" min="1" max="10" step="0.5" value="2">
+            <span class="value-display" id="valX">2</span>
         </div>
-
-        <!-- Sidebar (Left) -->
-        <div id="sidebar" class="absolute top-0 left-0 h-full w-64 glass sidebar-closed flex flex-col pt-20 px-4 pb-4 pointer-events-auto z-40 shadow-2xl">
-            <h2 class="text-xl font-bold text-blue-600 mb-2 flex items-center">📚 Thư Viện Hình</h2>
-            <div id="menu-list" class="flex-shrink-0 space-y-2 mb-2 overflow-y-auto h-full pr-1 custom-scrollbar"></div>
+        <div class="control-group">
+            <label style="color: green;">Trục Y:</label>
+            <input type="range" id="sizeY" min="1" max="10" step="0.5" value="2">
+            <span class="value-display" id="valY">2</span>
         </div>
-
-        <!-- Info Panel (Top Right - Below Controls) -->
-        <div id="info-card" class="absolute top-20 right-4 w-64 glass rounded-xl p-4 shadow-lg pointer-events-auto hidden transition-opacity z-30">
-            <h3 id="info-title" class="font-bold text-lg text-blue-700">--</h3>
-            <p id="info-desc" class="text-sm text-slate-600 mb-2">--</p>
-            <div class="bg-blue-50 p-2 rounded border border-blue-100 mb-2">
-                <span class="text-xs font-bold text-blue-500 uppercase block">Chi tiết:</span>
-                <span id="info-part" class="font-bold text-slate-800">--</span>
-                <p id="info-part-desc" class="text-xs text-slate-600">--</p>
-            </div>
-            <button onclick="document.getElementById('info-card').classList.add('hidden')" class="text-xs text-center w-full text-slate-400 hover:text-red-500 mt-1">Đóng</button>
+        <div class="control-group">
+            <label style="color: blue;">Trục Z:</label>
+            <input type="range" id="sizeZ" min="1" max="10" step="0.5" value="2">
+            <span class="value-display" id="valZ">2</span>
         </div>
-
-        <!-- AI Chat Panel (Bottom) -->
-        <div id="ai-panel" class="w-full md:w-[400px] h-[55vh] md:h-[500px] glass rounded-t-2xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] flex flex-col pointer-events-auto absolute bottom-0 left-0 md:left-1/2 z-50 ai-mobile-closed md:ai-desktop-closed">
-            <!-- Header -->
-            <div class="p-3 border-b border-gray-100 flex items-center justify-between bg-white/50 rounded-t-2xl cursor-pointer" onclick="toggleAI()">
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-white shadow-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-                    </div>
-                    <span class="font-bold text-slate-800">Gia Sư AI</span>
-                </div>
-                <button class="text-slate-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></button>
-            </div>
-
-            <!-- Chat Content -->
-            <div id="chat-box" class="flex-1 overflow-y-auto p-4 bg-white/40">
-                <div class="msg-ai chat-msg">Chào bạn! Mình có thể giúp gì về hình học không? ✨</div>
-            </div>
-
-            <!-- Suggestions -->
-            <div class="px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar border-t border-white/50 bg-white/60">
-                <button onclick="askAI('Đố vui về hình này!')" class="whitespace-nowrap px-3 py-1 bg-white border border-pink-100 rounded-full text-xs font-semibold text-pink-600 hover:bg-pink-50 shadow-sm">❓ Đố vui</button>
-                <button onclick="askAI('Công thức tính diện tích?')" class="whitespace-nowrap px-3 py-1 bg-white border border-indigo-100 rounded-full text-xs font-semibold text-indigo-600 hover:bg-indigo-50 shadow-sm">📏 Công thức</button>
-                <button onclick="askAI('Ứng dụng thực tế?')" class="whitespace-nowrap px-3 py-1 bg-white border border-green-100 rounded-full text-xs font-semibold text-green-600 hover:bg-green-50 shadow-sm">🌍 Thực tế</button>
-            </div>
-
-            <!-- Input -->
-            <div class="p-3 bg-white border-t border-gray-100">
-                <div class="flex gap-2">
-                    <input type="text" id="ai-input" placeholder="Nhập câu trả lời hoặc câu hỏi..." class="flex-1 px-4 py-2.5 rounded-full bg-gray-100 border-none text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" onkeypress="if(event.key==='Enter') askAI(this.value)">
-                    <button onclick="askAI(document.getElementById('ai-input').value)" class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow hover:bg-indigo-700 transition">
-                        <svg class="w-5 h-5 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                    </button>
-                </div>
-            </div>
+        <hr>
+        <div class="control-group">
+            <label>Gập / Mở:</label>
+            <input type="range" id="foldProgress" min="0" max="1" step="0.01" value="1">
+            <span class="value-display"></span>
         </div>
     </div>
 
-    <script>
-        const apiKey = ""; 
+    <script type="module">
+        import * as THREE from 'three';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // --- AUDIO MANAGER ---
-        let isMusic = false;
-        const audio = document.getElementById('bg-music');
-        
-        function toggleMusic() {
-            const btn = document.getElementById('btn-music');
-            isMusic = !isMusic;
-            
-            if (isMusic) {
-                audio.volume = 0.4;
-                audio.play().catch(e => {
-                    alert("Vui lòng chạm vào màn hình trước khi phát nhạc!");
-                    isMusic = false;
-                });
-                btn.classList.add('active');
-                document.getElementById('icon-music-off').classList.add('hidden');
-                document.getElementById('icon-music-on').classList.remove('hidden');
-            } else {
-                audio.pause();
-                btn.classList.remove('active');
-                document.getElementById('icon-music-off').classList.remove('hidden');
-                document.getElementById('icon-music-on').classList.add('hidden');
-            }
-        }
-
-        // --- CORE LOGIC ---
-        let isAiOpen = false;
-        let isMenuOpen = false;
-        let isCamera = false;
-        let currentShape = 'cube';
-        let chatHistoryLog = []; 
-
-        window.toggleAI = function() {
-            const panel = document.getElementById('ai-panel');
-            const btn = document.getElementById('btn-ai');
-            const iconOpen = document.getElementById('icon-ai-open');
-            const iconClose = document.getElementById('icon-ai-close');
-
-            isAiOpen = !isAiOpen;
-            
-            panel.classList.remove('ai-mobile-closed', 'ai-mobile-open', 'ai-desktop-closed', 'ai-desktop-open');
-            
-            if (isAiOpen) {
-                panel.classList.add('ai-mobile-open');
-                panel.classList.add('ai-desktop-open'); 
-                
-                btn.classList.add('ai-active');
-                iconOpen.classList.add('hidden');
-                iconClose.classList.remove('hidden');
-                
-                setTimeout(() => {
-                    const input = document.getElementById('ai-input');
-                    if(window.innerWidth > 768) input.focus();
-                }, 300);
-            } else {
-                panel.classList.add('ai-mobile-closed');
-                panel.classList.add('ai-desktop-closed');
-                
-                btn.classList.remove('ai-active');
-                iconOpen.classList.remove('hidden');
-                iconClose.classList.add('hidden');
-                document.getElementById('ai-input').blur();
-            }
-        };
-
-        window.toggleSidebar = function() {
-            const sb = document.getElementById('sidebar');
-            const iconOpen = document.getElementById('icon-menu-open');
-            const iconClose = document.getElementById('icon-menu-close');
-            
-            isMenuOpen = !isMenuOpen;
-            
-            if (isMenuOpen) {
-                sb.classList.remove('sidebar-closed');
-                sb.classList.add('sidebar-open');
-                iconOpen.classList.add('hidden');
-                iconClose.classList.remove('hidden');
-            } else {
-                sb.classList.remove('sidebar-open');
-                sb.classList.add('sidebar-closed');
-                iconOpen.classList.remove('hidden');
-                iconClose.classList.add('hidden');
-            }
-        };
-
-        window.toggleCamera = async function() {
-            const vid = document.getElementById('camera-feed');
-            const grad = document.getElementById('gradient-bg');
-            const btn = document.getElementById('btn-camera');
-            
-            if (!isCamera) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                    vid.srcObject = stream;
-                    vid.style.display = 'block';
-                    grad.style.opacity = '0';
-                    btn.classList.add('active');
-                    document.getElementById('icon-cam-off').classList.add('hidden');
-                    document.getElementById('icon-cam-on').classList.remove('hidden');
-                    isCamera = true;
-                } catch (e) { alert("Không thể mở Camera: " + e.message); }
-            } else {
-                const tracks = vid.srcObject?.getTracks();
-                if (tracks) tracks.forEach(t => t.stop());
-                vid.style.display = 'none';
-                grad.style.opacity = '1';
-                btn.classList.remove('active');
-                document.getElementById('icon-cam-off').classList.remove('hidden');
-                document.getElementById('icon-cam-on').classList.add('hidden');
-                isCamera = false;
-            }
-        };
-
-        // --- 2. THREE.JS SCENE ---
-        const container = document.getElementById('canvas-container');
+        // ==========================================
+        // 1. CÀI ĐẶT SCENE
+        // ==========================================
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(6, 6, 8);
-        
+        // Đảm bảo không có màu nền của scene đè lên camera AR
+        scene.background = null; 
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.05, 100);
+        camera.position.set(8, 6, 10);
+
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setClearColor(0x000000, 0); // Background trong suốt hoàn toàn
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        container.appendChild(renderer.domElement);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.xr.enabled = true; 
+        document.body.appendChild(renderer.domElement);
 
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
+        // THÊM DOM OVERLAY: Giữ lại giao diện HTML (bảng thanh trượt) khi vào AR
+        const arOptions = {
+            requiredFeatures: ['dom-overlay'],
+            domOverlay: { root: document.body }
+        };
+        const arButton = ARButton.createButton(renderer, arOptions);
+        document.body.appendChild(arButton);
 
-        // Lights
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0); 
+        controls.update();
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(5, 10, 7);
+        dirLight.position.set(10, 20, 15);
         scene.add(dirLight);
 
-        // Raycaster
-        const raycaster = new THREE.Raycaster();
-        let currentMesh = null;
+        // Group chính chứa mọi thứ
+        const mainGroup = new THREE.Group();
+        mainGroup.position.set(0, -1, -3); 
+        scene.add(mainGroup);
 
-        // --- 3. SHAPE DATA & LOGIC ---
-        const SHAPES = {
-            cube: { name: "Hình Lập Phương", create: () => new THREE.BoxGeometry(3,3,3), color: 0x3b82f6, desc: "6 mặt hình vuông đều nhau." },
-            box: { name: "Hình Hộp CN", create: () => new THREE.BoxGeometry(3,4,2), color: 0x10b981, desc: "Các mặt đối diện bằng nhau." },
-            cylinder: { name: "Hình Trụ", create: () => new THREE.CylinderGeometry(1.5,1.5,4,32), color: 0xf59e0b, desc: "Hai đáy là hình tròn." },
-            cone: { name: "Hình Nón", create: () => new THREE.ConeGeometry(2,4,32), color: 0xef4444, desc: "Đáy tròn, đỉnh nhọn." },
-            pyramid: { name: "Hình Chóp", create: () => { const g=new THREE.CylinderGeometry(0,2.5,3.5,4,1); g.rotateY(Math.PI/4); return g; }, color: 0x8b5cf6, desc: "Đáy vuông, mặt bên tam giác." },
-            prism: { name: "Lăng Trụ Tam Giác", create: () => new THREE.CylinderGeometry(2,2,4,3), color: 0xec4899, desc: "Hai đáy tam giác song song." },
-            sphere: { name: "Hình Cầu", create: () => new THREE.SphereGeometry(2.2,32,32), color: 0xf472b6, desc: "Tập hợp điểm cách đều tâm." },
-            hex_prism: { name: "Lăng Trụ Lục Giác", create: () => new THREE.CylinderGeometry(2,2,4,6), color: 0x2dd4bf, desc: "Hai đáy hình lục giác." },
-            tetrahedron: { name: "Hình Tứ Diện", create: () => new THREE.TetrahedronGeometry(2.5), color: 0xfacc15, desc: "4 mặt tam giác đều." }
-        };
-
-        window.loadShape = function(key) {
-            currentShape = key;
-            const data = SHAPES[key];
+        // --- XỬ LÝ SỰ KIỆN KHI VÀO/THOÁT AR ---
+        renderer.xr.addEventListener('sessionstart', () => {
+            // Thêm class in-ar để CSS làm trong nền trang web
+            document.body.classList.add('in-ar');
             
-            chatHistoryLog = []; 
-            document.getElementById('chat-box').innerHTML = '<div class="msg-ai chat-msg">Chào bạn! Mình có thể giúp gì về ' + data.name + ' không? ✨</div>';
-
-            if (currentMesh) {
-                scene.remove(currentMesh);
-                currentMesh.geometry.dispose();
-                currentMesh.material.dispose();
-            }
-
-            const mat = new THREE.MeshPhongMaterial({ 
-                color: data.color, shininess: 80, transparent: true, opacity: 0.9, side: THREE.DoubleSide 
-            });
-            currentMesh = new THREE.Mesh(data.create(), mat);
+            // Thu nhỏ 10 lần (1 đơn vị = 10cm)
+            mainGroup.scale.set(0.1, 0.1, 0.1);
             
-            const edges = new THREE.LineSegments(
-                new THREE.EdgesGeometry(currentMesh.geometry), 
-                new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 })
-            );
-            currentMesh.add(edges);
-            scene.add(currentMesh);
-
-            currentMesh.scale.set(0,0,0);
-            let s = 0;
-            const anim = setInterval(() => {
-                s += 0.1;
-                if (s >= 1) { currentMesh.scale.set(1,1,1); clearInterval(anim); }
-                else currentMesh.scale.set(s,s,s);
-            }, 16);
-
-            document.getElementById('info-title').innerText = data.name;
-            document.getElementById('info-desc').innerText = data.desc;
+            // Đặt gốc tọa độ ngay trước mặt (Z = -1m), hơi thấp xuống (Y = -0.3m)
+            mainGroup.position.set(0, -0.3, -1);
             
-            if (window.innerWidth < 768) {
-                isMenuOpen = true; 
-                toggleSidebar();
-            }
-        };
-
-        window.resetView = function() {
-            controls.reset();
-            camera.position.set(6, 6, 8);
-        };
-
-        // --- 4. INTERACTION ---
-        function checkIntersection(x, y) {
-            const rect = renderer.domElement.getBoundingClientRect();
-            const mouse = new THREE.Vector2(
-                ((x - rect.left) / rect.width) * 2 - 1,
-                -((y - rect.top) / rect.height) * 2 + 1
-            );
-            raycaster.setFromCamera(mouse, camera);
-            return raycaster.intersectObject(currentMesh);
-        }
-
-        let downX, downY;
-        container.addEventListener('pointerdown', e => { downX = e.clientX; downY = e.clientY; });
-        container.addEventListener('pointerup', e => {
-            const dist = Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY);
-            if (dist < 5) { 
-                const intersects = checkIntersection(e.clientX, e.clientY);
-                if (intersects.length > 0) {
-                    const hit = intersects[0];
-                    const normal = hit.face.normal;
-                    let partName = "Mặt Bên";
-                    let partDesc = "Các mặt bao quanh hình.";
-                    
-                    if (Math.abs(normal.y) > 0.8) {
-                        partName = "Mặt Đáy";
-                        partDesc = "Mặt phẳng trên hoặc dưới.";
-                    }
-                    if (currentShape === 'sphere') {
-                        partName = "Mặt Cầu"; partDesc = "Bề mặt cong khép kín.";
-                    }
-
-                    document.getElementById('info-card').classList.remove('hidden');
-                    document.getElementById('info-part').innerText = partName;
-                    document.getElementById('info-part-desc').innerText = partDesc;
-
-                    const oldHex = currentMesh.material.color.getHex();
-                    currentMesh.material.color.setHex(0xffff00);
-                    setTimeout(() => currentMesh.material.color.setHex(oldHex), 300);
-                } else {
-                    document.getElementById('info-card').classList.add('hidden');
-                }
-            }
+            // Tắt OrbitControls trong môi trường AR
+            controls.enabled = false;
         });
 
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
+        renderer.xr.addEventListener('sessionend', () => {
+            // Trả lại nền tối
+            document.body.classList.remove('in-ar');
+            
+            // Trả lại kích thước và vị trí ban đầu cho màn hình desktop
+            mainGroup.scale.set(1, 1, 1);
+            mainGroup.position.set(0, -1, -3);
+            
+            // Bật lại OrbitControls
+            controls.enabled = true;
+            controls.target.set(0, 0, 0);
+        });
+
+        // ==========================================
+        // 2. TẠO HỆ TRỤC TỌA ĐỘ VÀ SỐ (CÓ PHẦN ÂM)
+        // ==========================================
+        function createAxisLine(color, posLength, negLength, axis) {
+            const material = new THREE.LineBasicMaterial({ color: color, linewidth: 3 });
+            const points = [];
+            if(axis === 'x') { points.push(new THREE.Vector3(-negLength, 0, 0)); points.push(new THREE.Vector3(posLength, 0, 0)); }
+            if(axis === 'y') { points.push(new THREE.Vector3(0, 0, 0)); points.push(new THREE.Vector3(0, posLength, 0)); }
+            if(axis === 'z') { points.push(new THREE.Vector3(0, 0, -negLength)); points.push(new THREE.Vector3(0, 0, posLength)); }
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            return new THREE.Line(geometry, material);
         }
-        animate();
+
+        mainGroup.add(createAxisLine(0xff5555, 11, 10, 'x'));
+        mainGroup.add(createAxisLine(0x55ff55, 11, 0, 'y'));
+        mainGroup.add(createAxisLine(0x5555ff, 11, 10, 'z'));
+
+        function createTextSprite(text, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; 
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = color;
+            ctx.font = 'bold 36px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 64, 32);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
+            sprite.scale.set(0.8, 0.4, 0.4); 
+            return sprite;
+        }
+
+        for (let i = -10; i <= 10; i++) {
+            if (i === 0) continue;
+            const sx = createTextSprite(i.toString(), '#ffaaaa'); sx.position.set(i, -0.3, 0); mainGroup.add(sx);
+            const sz = createTextSprite(i.toString(), '#aaaaff'); sz.position.set(0, -0.3, i); mainGroup.add(sz);
+            if (i > 0) {
+                const sy = createTextSprite(i.toString(), '#aaffaa'); sy.position.set(-0.4, i, 0); mainGroup.add(sy);
+            }
+        }
+
+        // ==========================================
+        // 3 & 4. CƠ CHẾ HỘP GẬP MỞ 
+        // ==========================================
+        const boxContainer = new THREE.Group();
+        mainGroup.add(boxContainer);
+        const faces = {}; 
+
+        function createFlatFace(width, depth, color) {
+            const geometry = new THREE.PlaneGeometry(width, depth);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: color, side: THREE.DoubleSide, transparent: true, opacity: 0.9 
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.rotation.x = -Math.PI / 2;
+            const edges = new THREE.LineSegments(
+                new THREE.EdgesGeometry(geometry),
+                new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
+            );
+            mesh.add(edges);
+            return mesh;
+        }
+
+        function rebuildBox() {
+            while(boxContainer.children.length > 0) boxContainer.remove(boxContainer.children[0]);
+
+            const X = parseFloat(document.getElementById('sizeX').value);
+            const Y = parseFloat(document.getElementById('sizeY').value);
+            const Z = parseFloat(document.getElementById('sizeZ').value);
+
+            const assembly = new THREE.Group();
+            assembly.position.set(X/2, 0, Z/2);
+            boxContainer.add(assembly);
+
+            const bottom = createFlatFace(X, Z, 0x8B4513); assembly.add(bottom);
+
+            faces.right = { hinge: new THREE.Group() }; faces.right.hinge.position.set(X/2, 0, 0);
+            const rightMesh = createFlatFace(Y, Z, 0xD2691E); rightMesh.position.set(Y/2, 0, 0);
+            faces.right.hinge.add(rightMesh); assembly.add(faces.right.hinge);
+
+            faces.left = { hinge: new THREE.Group() }; faces.left.hinge.position.set(-X/2, 0, 0);
+            const leftMesh = createFlatFace(Y, Z, 0xCD853F); leftMesh.position.set(-Y/2, 0, 0);
+            faces.left.hinge.add(leftMesh); assembly.add(faces.left.hinge);
+
+            faces.front = { hinge: new THREE.Group() }; faces.front.hinge.position.set(0, 0, Z/2);
+            const frontMesh = createFlatFace(X, Y, 0xDAA520); frontMesh.position.set(0, 0, Y/2);
+            faces.front.hinge.add(frontMesh); assembly.add(faces.front.hinge);
+
+            faces.back = { hinge: new THREE.Group() }; faces.back.hinge.position.set(0, 0, -Z/2);
+            const backMesh = createFlatFace(X, Y, 0xB8860B); backMesh.position.set(0, 0, -Y/2);
+            faces.back.hinge.add(backMesh); assembly.add(faces.back.hinge);
+
+            faces.top = { hinge: new THREE.Group() }; faces.top.hinge.position.set(-Y, 0, 0);
+            const topMesh = createFlatFace(X, Z, 0xF4A460); topMesh.position.set(-X/2, 0, 0);
+            faces.top.hinge.add(topMesh); faces.left.hinge.add(faces.top.hinge);
+
+            updateFold();
+        }
+
+        function updateFold() {
+            const p = parseFloat(document.getElementById('foldProgress').value);
+            if(faces.right) faces.right.hinge.rotation.z = p * (Math.PI / 2);
+            if(faces.left)  faces.left.hinge.rotation.z = p * (-Math.PI / 2);
+            if(faces.front) faces.front.hinge.rotation.x = p * (-Math.PI / 2);
+            if(faces.back)  faces.back.hinge.rotation.x = p * (Math.PI / 2);
+            if(faces.top)   faces.top.hinge.rotation.z = p * (-Math.PI / 2);
+        }
+
+        ['sizeX', 'sizeY', 'sizeZ'].forEach(id => {
+            document.getElementById(id).addEventListener('input', (e) => {
+                document.getElementById('val' + id.slice(-1)).innerText = e.target.value;
+                rebuildBox();
+            });
+        });
+
+        document.getElementById('foldProgress').addEventListener('input', updateFold);
+
+        rebuildBox();
+
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // --- 5. AI CHAT ---
-        const chatBox = document.getElementById('chat-box');
-        
-        window.askAI = async function(prompt) {
-            if (!prompt) return;
-            const input = document.getElementById('ai-input');
-            input.value = '';
-
-            const uDiv = document.createElement('div');
-            uDiv.className = 'msg-user chat-msg';
-            uDiv.innerText = prompt;
-            chatBox.appendChild(uDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            const lDiv = document.createElement('div');
-            lDiv.className = 'msg-ai chat-msg typing';
-            lDiv.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
-            chatBox.appendChild(lDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            try {
-                const shapeName = SHAPES[currentShape].name;
-                
-                const sysPrompt = `Bạn là Gia Sư AI toán học thân thiện dành cho học sinh Việt Nam. 
-                Ngữ cảnh: Học sinh đang quan sát mô hình 3D của: ${shapeName}.
-                
-                Nhiệm vụ của bạn:
-                1. Nếu học sinh hỏi kiến thức: Giải thích ngắn gọn (<50 từ), dễ hiểu, dùng emoji vui nhộn.
-                2. Nếu học sinh yêu cầu "Đố vui", "Câu đố", hoặc "Kiểm tra": Hãy tạo ra MỘT câu hỏi trắc nghiệm (có các lựa chọn A, B, C, D) hoặc một câu hỏi tự luận ngắn liên quan đến ${shapeName}. 
-                QUAN TRỌNG: KHÔNG ĐƯỢC đưa ra đáp án ngay lập tức. Hãy đặt câu hỏi và chờ học sinh trả lời ở lượt sau.
-                3. Nếu học sinh đang trả lời câu hỏi trước đó: Hãy nhận xét đúng/sai và giải thích ngắn gọn.
-                
-                Hãy giữ giọng điệu khích lệ và vui vẻ.`;
-                
-                chatHistoryLog.push({ role: "user", parts: [{ text: `Học sinh hỏi về ${shapeName}: "${prompt}"` }] });
-
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        contents: chatHistoryLog,
-                        systemInstruction: { parts: [{ text: sysPrompt }] }
-                    })
-                });
-                
-                const data = await res.json();
-                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Lỗi kết nối AI.";
-                
-                chatHistoryLog.push({ role: "model", parts: [{ text: reply }] });
-                
-                lDiv.className = 'msg-ai chat-msg';
-                lDiv.innerHTML = marked.parse(reply);
-                
-            } catch (err) {
-                lDiv.innerText = "Hệ thống đang bận, thử lại sau nhé!";
+        renderer.setAnimationLoop(() => {
+            if (!renderer.xr.isPresenting && controls.enabled) {
+                controls.update();
             }
-            chatBox.scrollTop = chatBox.scrollHeight;
-        };
-
-        // --- 6. INIT ---
-        const menuList = document.getElementById('menu-list');
-        for (let key in SHAPES) {
-            const btn = document.createElement('div');
-            btn.className = "p-3 mb-2 bg-white rounded-lg shadow-sm border border-slate-100 cursor-pointer hover:bg-blue-50 transition font-semibold text-slate-700";
-            btn.innerText = SHAPES[key].name;
-            btn.onclick = () => loadShape(key);
-            menuList.appendChild(btn);
-        }
-        
-        loadShape('cube');
+            renderer.render(scene, camera);
+        });
     </script>
 </body>
 </html>
 
 
+```
