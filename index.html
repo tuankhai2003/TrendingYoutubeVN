@@ -4,79 +4,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mô Hình AR - Đã Fix Kích Thước & Giao Diện AR</title>
+    <title>AR Pro - Bản lề chuẩn xác</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            /* Màu nền mặc định khi ở chế độ 3D máy tính */
-            background-color: #1a1a1a; 
-            transition: background-color 0.3s ease;
-        }
-        /* KHI VÀO AR: Bắt buộc nền phải trong suốt để thấy Camera */
-        body.in-ar {
-            background-color: transparent !important;
-        }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #1a1a1a; }
         
         #ui-panel {
-            position: absolute;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
+            position: absolute; top: 15px; right: 15px;
             background: rgba(255, 255, 255, 0.95);
-            padding: 20px;
-            border-radius: 12px;
+            padding: 15px; border-radius: 10px;
+            width: 260px; z-index: 1000;
             box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            z-index: 1000;
-            width: 320px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+            transition: transform 0.3s ease;
         }
-        .control-group {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+        .collapsed { transform: translateX(150%); }
+
+        #toggle-ui {
+            position: absolute; top: 15px; right: 290px;
+            padding: 10px; background: white; border-radius: 8px;
+            cursor: pointer; font-weight: bold; z-index: 1001;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: right 0.3s ease;
         }
-        .control-group label {
-            font-weight: bold;
-            color: #333;
-            width: 70px;
-            font-size: 14px;
-        }
-        .control-group input[type="range"] {
-            flex-grow: 1;
-            margin: 0 10px;
-        }
-        .control-group .value-display {
-            width: 30px;
-            text-align: right;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        #valX { color: #ff0000; }
-        #valY { color: #00aa00; }
-        #valZ { color: #0000ff; }
-        hr { border: none; border-top: 1px solid #ddd; margin: 5px 0; }
+        .ui-hidden-btn { right: 15px !important; }
+
+        .control-group { display: flex; align-items: center; margin-bottom: 12px; }
+        .control-group label { flex: 1; font-size: 13px; font-weight: bold; }
+        .control-group input { flex: 2; margin: 0 10px; }
+        .val { width: 25px; text-align: right; font-size: 13px; font-weight: bold; }
         
+        hr { border: none; border-top: 1px solid #ddd; margin: 10px 0; }
+
         #instruction {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            background: rgba(0,0,0,0.6);
-            padding: 12px;
-            border-radius: 8px;
-            pointer-events: none;
-            font-size: 14px;
-            line-height: 1.5;
-            z-index: 1000;
+            position: absolute; top: 15px; left: 15px;
+            color: white; background: rgba(0,0,0,0.6);
+            padding: 12px; border-radius: 8px; font-size: 13px;
+            pointer-events: none; line-height: 1.5;
         }
-        /* Ẩn bảng hướng dẫn khi vào AR cho gọn màn hình */
-        body.in-ar #instruction {
-            display: none;
-        }
+        body.in-ar #instruction { display: none; }
+        body.in-ar { background-color: transparent !important; }
     </style>
     <script type="importmap">
         {
@@ -90,33 +55,32 @@
 <body>
 
     <div id="instruction">
-        👉 Dùng chuột để xoay / phóng to.<br>
-        👉 Bấm <b>"ENTER AR"</b> để xem ngoài đời thực.<br>
-        <i>(Mô hình sẽ tự động xuất hiện phía trước bạn 1 mét)</i>
+        👉 Máy tính: Chuột để xoay/zoom<br>
+        👉 AR: 1 ngón xoay, 2 ngón zoom
     </div>
 
+    <div id="toggle-ui">Ẩn/Hiện Cài đặt</div>
+
     <div id="ui-panel">
-        <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">Điều chỉnh kích thước (1-10)</div>
         <div class="control-group">
-            <label style="color: red;">Trục X:</label>
+            <label style="color:#ff0000">Trục X:</label>
             <input type="range" id="sizeX" min="1" max="10" step="0.5" value="2">
-            <span class="value-display" id="valX">2</span>
+            <span class="val" id="valX">2</span>
         </div>
         <div class="control-group">
-            <label style="color: green;">Trục Y:</label>
+            <label style="color:#00aa00">Trục Y:</label>
             <input type="range" id="sizeY" min="1" max="10" step="0.5" value="2">
-            <span class="value-display" id="valY">2</span>
+            <span class="val" id="valY">2</span>
         </div>
         <div class="control-group">
-            <label style="color: blue;">Trục Z:</label>
+            <label style="color:#0000ff">Trục Z:</label>
             <input type="range" id="sizeZ" min="1" max="10" step="0.5" value="2">
-            <span class="value-display" id="valZ">2</span>
+            <span class="val" id="valZ">2</span>
         </div>
         <hr>
         <div class="control-group">
-            <label>Gập / Mở:</label>
+            <label>Gập/Mở:</label>
             <input type="range" id="foldProgress" min="0" max="1" step="0.01" value="1">
-            <span class="value-display"></span>
         </div>
     </div>
 
@@ -126,175 +90,139 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         // ==========================================
-        // 1. CÀI ĐẶT SCENE
+        // 1. SETUP CORE
         // ==========================================
         const scene = new THREE.Scene();
-        // Đảm bảo không có màu nền của scene đè lên camera AR
-        scene.background = null; 
-
-        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.05, 100);
-        camera.position.set(8, 6, 10);
-
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 100);
+        
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setClearColor(0x000000, 0); // Background trong suốt hoàn toàn
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.xr.enabled = true; 
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.xr.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // THÊM DOM OVERLAY: Giữ lại giao diện HTML (bảng thanh trượt) khi vào AR
-        const arOptions = {
+        document.body.appendChild(ARButton.createButton(renderer, {
             requiredFeatures: ['dom-overlay'],
             domOverlay: { root: document.body }
-        };
-        const arButton = ARButton.createButton(renderer, arOptions);
-        document.body.appendChild(arButton);
+        }));
 
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.target.set(0, 0, 0); 
+        camera.position.set(6, 6, 8);
+        controls.target.set(2, 0, 2);
         controls.update();
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(10, 20, 15);
-        scene.add(dirLight);
+        const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+        sun.position.set(10, 20, 15);
+        scene.add(sun);
 
-        // Group chính chứa mọi thứ
         const mainGroup = new THREE.Group();
-        mainGroup.position.set(0, -1, -3); 
+        mainGroup.position.set(-1, -1, -2); // Vị trí nhìn trên máy tính
         scene.add(mainGroup);
 
-        // --- XỬ LÝ SỰ KIỆN KHI VÀO/THOÁT AR ---
-        renderer.xr.addEventListener('sessionstart', () => {
-            // Thêm class in-ar để CSS làm trong nền trang web
-            document.body.classList.add('in-ar');
-            
-            // Thu nhỏ 10 lần (1 đơn vị = 10cm)
-            mainGroup.scale.set(0.1, 0.1, 0.1);
-            
-            // Đặt gốc tọa độ ngay trước mặt (Z = -1m), hơi thấp xuống (Y = -0.3m)
-            mainGroup.position.set(0, -0.3, -1);
-            
-            // Tắt OrbitControls trong môi trường AR
-            controls.enabled = false;
-        });
-
-        renderer.xr.addEventListener('sessionend', () => {
-            // Trả lại nền tối
-            document.body.classList.remove('in-ar');
-            
-            // Trả lại kích thước và vị trí ban đầu cho màn hình desktop
-            mainGroup.scale.set(1, 1, 1);
-            mainGroup.position.set(0, -1, -3);
-            
-            // Bật lại OrbitControls
-            controls.enabled = true;
-            controls.target.set(0, 0, 0);
-        });
-
         // ==========================================
-        // 2. TẠO HỆ TRỤC TỌA ĐỘ VÀ SỐ (CÓ PHẦN ÂM)
+        // 2. HỆ TRỤC & SỐ (-10 đến 10)
         // ==========================================
-        function createAxisLine(color, posLength, negLength, axis) {
-            const material = new THREE.LineBasicMaterial({ color: color, linewidth: 3 });
-            const points = [];
-            if(axis === 'x') { points.push(new THREE.Vector3(-negLength, 0, 0)); points.push(new THREE.Vector3(posLength, 0, 0)); }
-            if(axis === 'y') { points.push(new THREE.Vector3(0, 0, 0)); points.push(new THREE.Vector3(0, posLength, 0)); }
-            if(axis === 'z') { points.push(new THREE.Vector3(0, 0, -negLength)); points.push(new THREE.Vector3(0, 0, posLength)); }
-            const geometry = new THREE.BufferGeometry().setFromPoints(points);
-            return new THREE.Line(geometry, material);
+        function createAxis(color, pLen, nLen, axis) {
+            const pts = [];
+            if(axis==='x') { pts.push(new THREE.Vector3(-nLen,0,0)); pts.push(new THREE.Vector3(pLen,0,0)); }
+            if(axis==='y') { pts.push(new THREE.Vector3(0,0,0)); pts.push(new THREE.Vector3(0,pLen,0)); }
+            if(axis==='z') { pts.push(new THREE.Vector3(0,0,-nLen)); pts.push(new THREE.Vector3(0,0,pLen)); }
+            return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color, linewidth: 2}));
         }
+        mainGroup.add(createAxis(0xff5555, 11, 10, 'x'));
+        mainGroup.add(createAxis(0x55ff55, 11, 0, 'y'));
+        mainGroup.add(createAxis(0x5555ff, 11, 10, 'z'));
 
-        mainGroup.add(createAxisLine(0xff5555, 11, 10, 'x'));
-        mainGroup.add(createAxisLine(0x55ff55, 11, 0, 'y'));
-        mainGroup.add(createAxisLine(0x5555ff, 11, 10, 'z'));
-
-        function createTextSprite(text, color) {
+        function makeLabel(txt, color, x, y, z) {
             const canvas = document.createElement('canvas');
-            canvas.width = 128; 
-            canvas.height = 64;
+            canvas.width = 128; canvas.height = 64;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = color;
-            ctx.font = 'bold 36px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(text, 64, 32);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
-            sprite.scale.set(0.8, 0.4, 0.4); 
-            return sprite;
+            ctx.fillStyle = color; ctx.font = 'bold 36px Arial'; 
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(txt, 64, 32);
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map: new THREE.CanvasTexture(canvas), depthTest: false}));
+            sprite.position.set(x, y, z); sprite.scale.set(0.8, 0.4, 0.4);
+            mainGroup.add(sprite);
         }
 
-        for (let i = -10; i <= 10; i++) {
-            if (i === 0) continue;
-            const sx = createTextSprite(i.toString(), '#ffaaaa'); sx.position.set(i, -0.3, 0); mainGroup.add(sx);
-            const sz = createTextSprite(i.toString(), '#aaaaff'); sz.position.set(0, -0.3, i); mainGroup.add(sz);
-            if (i > 0) {
-                const sy = createTextSprite(i.toString(), '#aaffaa'); sy.position.set(-0.4, i, 0); mainGroup.add(sy);
-            }
+        for(let i=-10; i<=10; i++) {
+            if(i===0) continue;
+            makeLabel(i, '#ffaaaa', i, -0.3, 0); // Trục X
+            makeLabel(i, '#aaaaff', 0, -0.3, i); // Trục Z
+            if(i>0) makeLabel(i, '#aaffaa', -0.4, i, 0); // Trục Y (chỉ dương)
         }
 
         // ==========================================
-        // 3 & 4. CƠ CHẾ HỘP GẬP MỞ 
+        // 3. MÔ HÌNH HỘP & BẢN LỀ CHUẨN XÁC
         // ==========================================
         const boxContainer = new THREE.Group();
         mainGroup.add(boxContainer);
         const faces = {}; 
 
+        // Hàm tạo mặt phẳng trải dài trên sàn (XZ Plane)
         function createFlatFace(width, depth, color) {
-            const geometry = new THREE.PlaneGeometry(width, depth);
-            const material = new THREE.MeshStandardMaterial({ 
-                color: color, side: THREE.DoubleSide, transparent: true, opacity: 0.9 
-            });
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.rotation.x = -Math.PI / 2;
-            const edges = new THREE.LineSegments(
-                new THREE.EdgesGeometry(geometry),
-                new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
-            );
-            mesh.add(edges);
+            const geom = new THREE.PlaneGeometry(width, depth);
+            const mat = new THREE.MeshStandardMaterial({ color: color, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.rotation.x = -Math.PI / 2; // Đặt phẳng xuống đất
+            mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })));
             return mesh;
         }
 
-        function rebuildBox() {
+        function buildBox() {
             while(boxContainer.children.length > 0) boxContainer.remove(boxContainer.children[0]);
 
             const X = parseFloat(document.getElementById('sizeX').value);
             const Y = parseFloat(document.getElementById('sizeY').value);
             const Z = parseFloat(document.getElementById('sizeZ').value);
 
+            // Assembly giúp dời tâm hộp về (0,0,0) sao cho nó chỉ phát triển về hướng dương
             const assembly = new THREE.Group();
             assembly.position.set(X/2, 0, Z/2);
             boxContainer.add(assembly);
 
-            const bottom = createFlatFace(X, Z, 0x8B4513); assembly.add(bottom);
+            // 1. ĐÁY
+            const bottom = createFlatFace(X, Z, 0x8B4513);
+            assembly.add(bottom);
 
-            faces.right = { hinge: new THREE.Group() }; faces.right.hinge.position.set(X/2, 0, 0);
+            // 2. PHẢI
+            faces.right = { hinge: new THREE.Group() };
+            faces.right.hinge.position.set(X/2, 0, 0);
             const rightMesh = createFlatFace(Y, Z, 0xD2691E); rightMesh.position.set(Y/2, 0, 0);
             faces.right.hinge.add(rightMesh); assembly.add(faces.right.hinge);
 
-            faces.left = { hinge: new THREE.Group() }; faces.left.hinge.position.set(-X/2, 0, 0);
+            // 3. TRÁI
+            faces.left = { hinge: new THREE.Group() };
+            faces.left.hinge.position.set(-X/2, 0, 0);
             const leftMesh = createFlatFace(Y, Z, 0xCD853F); leftMesh.position.set(-Y/2, 0, 0);
             faces.left.hinge.add(leftMesh); assembly.add(faces.left.hinge);
 
-            faces.front = { hinge: new THREE.Group() }; faces.front.hinge.position.set(0, 0, Z/2);
+            // 4. TRƯỚC (Gần Z dương)
+            faces.front = { hinge: new THREE.Group() };
+            faces.front.hinge.position.set(0, 0, Z/2);
             const frontMesh = createFlatFace(X, Y, 0xDAA520); frontMesh.position.set(0, 0, Y/2);
             faces.front.hinge.add(frontMesh); assembly.add(faces.front.hinge);
 
-            faces.back = { hinge: new THREE.Group() }; faces.back.hinge.position.set(0, 0, -Z/2);
+            // 5. SAU (Z = 0)
+            faces.back = { hinge: new THREE.Group() };
+            faces.back.hinge.position.set(0, 0, -Z/2);
             const backMesh = createFlatFace(X, Y, 0xB8860B); backMesh.position.set(0, 0, -Y/2);
             faces.back.hinge.add(backMesh); assembly.add(faces.back.hinge);
 
-            faces.top = { hinge: new THREE.Group() }; faces.top.hinge.position.set(-Y, 0, 0);
+            // 6. TRÊN (NẮP) - Dính vào mặt trái
+            faces.top = { hinge: new THREE.Group() };
+            faces.top.hinge.position.set(-Y, 0, 0); // Mép ngoài cùng của mặt trái
             const topMesh = createFlatFace(X, Z, 0xF4A460); topMesh.position.set(-X/2, 0, 0);
-            faces.top.hinge.add(topMesh); faces.left.hinge.add(faces.top.hinge);
+            faces.top.hinge.add(topMesh); 
+            faces.left.hinge.add(faces.top.hinge); // Nối vào bản lề trái
 
-            updateFold();
+            applyFold();
         }
 
-        function updateFold() {
+        function applyFold() {
             const p = parseFloat(document.getElementById('foldProgress').value);
+            // p=0: góc=0 (trải phẳng), p=1: gập 90 độ (đóng hộp)
             if(faces.right) faces.right.hinge.rotation.z = p * (Math.PI / 2);
             if(faces.left)  faces.left.hinge.rotation.z = p * (-Math.PI / 2);
             if(faces.front) faces.front.hinge.rotation.x = p * (-Math.PI / 2);
@@ -302,16 +230,75 @@
             if(faces.top)   faces.top.hinge.rotation.z = p * (-Math.PI / 2);
         }
 
-        ['sizeX', 'sizeY', 'sizeZ'].forEach(id => {
-            document.getElementById(id).addEventListener('input', (e) => {
-                document.getElementById('val' + id.slice(-1)).innerText = e.target.value;
-                rebuildBox();
-            });
+        // ==========================================
+        // 4. TƯƠNG TÁC AR (CHẠM & ZOOM)
+        // ==========================================
+        let initialDist = 0, initialScale = 1;
+        let isTouching = false, prevTouchX = 0;
+
+        window.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                initialScale = mainGroup.scale.x;
+            } else if (e.touches.length === 1 && renderer.xr.isPresenting) {
+                // Chỉ nhận lướt tay xoay khi trong AR
+                isTouching = true;
+                prevTouchX = e.touches[0].pageX;
+            }
         });
 
-        document.getElementById('foldProgress').addEventListener('input', updateFold);
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2 && initialDist > 0) {
+                const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                const zoom = (dist / initialDist) * initialScale;
+                const finalZoom = Math.max(0.02, Math.min(zoom, 1)); // Zoom limit
+                mainGroup.scale.set(finalZoom, finalZoom, finalZoom);
+            } else if (e.touches.length === 1 && isTouching) {
+                const deltaX = e.touches[0].pageX - prevTouchX;
+                mainGroup.rotation.y += deltaX * 0.015; // Xoay khối
+                prevTouchX = e.touches[0].pageX;
+            }
+        });
 
-        rebuildBox();
+        window.addEventListener('touchend', () => { isTouching = false; initialDist = 0; });
+
+        // ==========================================
+        // 5. SỰ KIỆN GIAO DIỆN & AR STATE
+        // ==========================================
+        renderer.xr.addEventListener('sessionstart', () => {
+            document.body.classList.add('in-ar');
+            mainGroup.scale.set(0.1, 0.1, 0.1); 
+            mainGroup.position.set(0, -0.5, -1.2); // Vị trí mô hình xuất hiện (trước mặt)
+            mainGroup.rotation.set(0, 0, 0); // Đặt lại góc quay
+            controls.enabled = false;
+        });
+
+        renderer.xr.addEventListener('sessionend', () => {
+            document.body.classList.remove('in-ar');
+            mainGroup.scale.set(1, 1, 1);
+            mainGroup.position.set(-1, -1, -2);
+            mainGroup.rotation.set(0, 0, 0);
+            camera.position.set(6, 6, 8);
+            controls.target.set(2, 0, 2);
+            controls.enabled = true;
+            controls.update();
+        });
+
+        const toggleBtn = document.getElementById('toggle-ui');
+        const uiPanel = document.getElementById('ui-panel');
+        toggleBtn.onclick = () => {
+            uiPanel.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('ui-hidden-btn');
+        };
+
+        ['sizeX', 'sizeY', 'sizeZ'].forEach(id => document.getElementById(id).addEventListener('input', (e) => {
+            document.getElementById('val'+id.slice(-1)).innerText = e.target.value;
+            buildBox();
+        }));
+        document.getElementById('foldProgress').addEventListener('input', applyFold);
+
+        // Khởi tạo
+        buildBox();
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
@@ -320,14 +307,11 @@
         });
 
         renderer.setAnimationLoop(() => {
-            if (!renderer.xr.isPresenting && controls.enabled) {
-                controls.update();
-            }
+            if(!renderer.xr.isPresenting) controls.update();
             renderer.render(scene, camera);
         });
     </script>
 </body>
 </html>
-
 
 ```
