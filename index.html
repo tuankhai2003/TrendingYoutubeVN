@@ -3,18 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Geometry Pro - Minimal UI</title>
+    <title>AR Geometry - Gập Mở Trục xOy</title>
     <style>
-        body { 
+        html, body { 
             margin: 0; 
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
             overflow: hidden; 
             font-family: 'Segoe UI', Roboto, sans-serif; 
             background-color: #1a1a1a; 
             touch-action: none; 
         }
 
-        /* Nút Cài đặt */
-        #toggle-ui {
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .toggle-btn {
             position: absolute; top: 15px; right: 15px;
             padding: 10px 15px; background: #ffffff; border: none;
             border-radius: 8px; cursor: pointer; font-weight: bold; 
@@ -22,7 +30,6 @@
             font-size: 13px; color: #e44d26;
         }
 
-        /* Bảng Cài đặt - Góc trên bên phải */
         #ui-panel {
             position: absolute; top: 65px; right: 15px;
             background: rgba(255, 255, 255, 0.95);
@@ -41,7 +48,6 @@
         .val { width: 30px; text-align: right; font-size: 12px; font-weight: bold; }
         
         hr { border: none; border-top: 1px solid #eee; margin: 10px 0; }
-        body.in-ar { background-color: transparent !important; }
     </style>
     <script type="importmap">
         {
@@ -54,7 +60,7 @@
 </head>
 <body>
 
-    <button id="toggle-ui">Cài đặt</button>
+    <button id="toggle-ui" class="toggle-btn">Cài đặt</button>
     <div id="ui-panel">
         <div style="font-size: 13px; font-weight: bold; margin-bottom: 10px; text-align: center; color:#555;">KÍCH THƯỚC (1-10)</div>
         <div class="control-group">
@@ -86,7 +92,10 @@
 
         // 1. SETUP CORE
         const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a1a); 
+        
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 100);
+        
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -99,8 +108,9 @@
         }));
 
         const controls = new OrbitControls(camera, renderer.domElement);
-        camera.position.set(6, 6, 8);
-        controls.target.set(2, 0, 2);
+        // Thay đổi góc nhìn ban đầu thẳng vào mặt phẳng xOy
+        camera.position.set(5, 5, 12);
+        controls.target.set(2, 2, 0);
         controls.update();
 
         scene.add(new THREE.AmbientLight(0xffffff, 1.0));
@@ -112,33 +122,29 @@
         mainGroup.position.set(-1, -1, -2);
         scene.add(mainGroup);
 
-        // --- KHÓA SỰ KIỆN TRÊN UI ---
         const uiElements = [document.getElementById('ui-panel'), document.getElementById('toggle-ui')];
-        
         uiElements.forEach(el => {
             ['touchstart', 'touchend', 'touchmove', 'mousedown', 'pointerdown'].forEach(ev => {
                 el.addEventListener(ev, (e) => e.stopPropagation());
             });
         });
 
-        // --- NÚT ẨN HIỆN BẢNG CÀI ĐẶT ---
         document.getElementById('toggle-ui').onclick = () => {
-            const panel = document.getElementById('ui-panel');
-            panel.classList.toggle('hidden');
+            document.getElementById('ui-panel').classList.toggle('hidden');
         };
 
         // ==========================================
-        // 2. HỆ TRỤC & MÔ HÌNH 
+        // 2. HỆ TRỤC & MÔ HÌNH (THÊM SỐ ÂM CHO TRỤC Y)
         // ==========================================
         function createAxis(color, pLen, nLen, axis) {
             const pts = [];
             if(axis==='x') { pts.push(new THREE.Vector3(-nLen,0,0)); pts.push(new THREE.Vector3(pLen,0,0)); }
-            if(axis==='y') { pts.push(new THREE.Vector3(0,0,0)); pts.push(new THREE.Vector3(0,pLen,0)); }
+            if(axis==='y') { pts.push(new THREE.Vector3(0,-nLen,0)); pts.push(new THREE.Vector3(0,pLen,0)); } // Mở rộng Y âm
             if(axis==='z') { pts.push(new THREE.Vector3(0,0,-nLen)); pts.push(new THREE.Vector3(0,0,pLen)); }
             return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color, linewidth: 2}));
         }
         mainGroup.add(createAxis(0xff5555, 11, 10, 'x'));
-        mainGroup.add(createAxis(0x55ff55, 11, 0, 'y'));
+        mainGroup.add(createAxis(0x55ff55, 11, 10, 'y')); 
         mainGroup.add(createAxis(0x5555ff, 11, 10, 'z'));
 
         function makeLabel(txt, color, x, y, z) {
@@ -156,18 +162,19 @@
             if(i===0) continue;
             makeLabel(i, '#ffaaaa', i, -0.3, 0); 
             makeLabel(i, '#aaaaff', 0, -0.3, i); 
-            if(i>0) makeLabel(i, '#aaffaa', -0.4, i, 0); 
+            makeLabel(i, '#aaffaa', -0.4, i, 0); // Vẽ nhãn Y cho cả phần âm
         }
 
         const boxContainer = new THREE.Group();
         mainGroup.add(boxContainer);
         const faces = {}; 
 
-        function createFlatFace(width, depth, color) {
-            const geom = new THREE.PlaneGeometry(width, depth);
+        // Hàm tạo mặt phẳng thẳng đứng trên xOy
+        function createFaceXY(width, height, color) {
+            const geom = new THREE.PlaneGeometry(width, height);
             const mat = new THREE.MeshStandardMaterial({ color, side: 2, transparent: true, opacity: 0.9 });
             const mesh = new THREE.Mesh(geom, mat);
-            mesh.rotation.x = -Math.PI / 2; 
+            // Không xoay nữa, mặc định PlaneGeometry nằm trên xOy
             mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color: 0xffffff })));
             return mesh;
         }
@@ -177,37 +184,71 @@
             const X = parseFloat(document.getElementById('sizeX').value);
             const Y = parseFloat(document.getElementById('sizeY').value);
             const Z = parseFloat(document.getElementById('sizeZ').value);
-            const assembly = new THREE.Group(); assembly.position.set(X/2, 0, Z/2); boxContainer.add(assembly);
-            const bottom = createFlatFace(X, Z, 0x8B4513); assembly.add(bottom);
-            faces.right = { hinge: new THREE.Group() }; faces.right.hinge.position.set(X/2, 0, 0);
-            const rightMesh = createFlatFace(Y, Z, 0xD2691E); rightMesh.position.set(Y/2, 0, 0);
-            faces.right.hinge.add(rightMesh); assembly.add(faces.right.hinge);
-            faces.left = { hinge: new THREE.Group() }; faces.left.hinge.position.set(-X/2, 0, 0);
-            const leftMesh = createFlatFace(Y, Z, 0xCD853F); leftMesh.position.set(-Y/2, 0, 0);
-            faces.left.hinge.add(leftMesh); assembly.add(faces.left.hinge);
-            faces.front = { hinge: new THREE.Group() }; faces.front.hinge.position.set(0, 0, Z/2);
-            const frontMesh = createFlatFace(X, Y, 0xDAA520); frontMesh.position.set(0, 0, Y/2);
-            faces.front.hinge.add(frontMesh); assembly.add(faces.front.hinge);
-            faces.back = { hinge: new THREE.Group() }; faces.back.hinge.position.set(0, 0, -Z/2);
-            const backMesh = createFlatFace(X, Y, 0xB8860B); backMesh.position.set(0, 0, -Y/2);
-            faces.back.hinge.add(backMesh); assembly.add(faces.back.hinge);
-            faces.top = { hinge: new THREE.Group() }; faces.top.hinge.position.set(-Y, 0, 0); 
-            const topMesh = createFlatFace(X, Z, 0xF4A460); topMesh.position.set(-X/2, 0, 0);
-            faces.top.hinge.add(topMesh); faces.left.hinge.add(faces.top.hinge); 
+            
+            const assembly = new THREE.Group(); 
+            // Căn chỉnh tâm mặt lưng về xOy, phát triển về phía dương
+            assembly.position.set(X/2, Y/2, 0); 
+            boxContainer.add(assembly);
+            
+            // 1. MẶT LƯNG (BACK) - Cố định
+            const back = createFaceXY(X, Y, 0x8B4513); 
+            assembly.add(back);
+            
+            // 2. MẶT PHẢI
+            faces.right = { hinge: new THREE.Group() }; 
+            faces.right.hinge.position.set(X/2, 0, 0);
+            const rightMesh = createFaceXY(Z, Y, 0xD2691E); 
+            rightMesh.position.set(Z/2, 0, 0);
+            faces.right.hinge.add(rightMesh); 
+            assembly.add(faces.right.hinge);
+            
+            // 3. MẶT TRÁI
+            faces.left = { hinge: new THREE.Group() }; 
+            faces.left.hinge.position.set(-X/2, 0, 0);
+            const leftMesh = createFaceXY(Z, Y, 0xCD853F); 
+            leftMesh.position.set(-Z/2, 0, 0);
+            faces.left.hinge.add(leftMesh); 
+            assembly.add(faces.left.hinge);
+            
+            // 4. MẶT TRÊN (Đỉnh)
+            faces.top = { hinge: new THREE.Group() }; 
+            faces.top.hinge.position.set(0, Y/2, 0);
+            const topMesh = createFaceXY(X, Z, 0xDAA520); 
+            topMesh.position.set(0, Z/2, 0);
+            faces.top.hinge.add(topMesh); 
+            assembly.add(faces.top.hinge);
+            
+            // 5. MẶT DƯỚI (Đáy)
+            faces.bottom = { hinge: new THREE.Group() }; 
+            faces.bottom.hinge.position.set(0, -Y/2, 0);
+            const bottomMesh = createFaceXY(X, Z, 0xB8860B); 
+            bottomMesh.position.set(0, -Z/2, 0);
+            faces.bottom.hinge.add(bottomMesh); 
+            assembly.add(faces.bottom.hinge);
+            
+            // 6. MẶT TRƯỚC (NẮP) - Dính vào mặt trái
+            faces.front = { hinge: new THREE.Group() }; 
+            faces.front.hinge.position.set(-Z, 0, 0); 
+            const frontMesh = createFaceXY(X, Y, 0xF4A460); 
+            frontMesh.position.set(-X/2, 0, 0);
+            faces.front.hinge.add(frontMesh); 
+            faces.left.hinge.add(faces.front.hinge); 
+            
             applyFold();
         }
 
         function applyFold() {
             const p = parseFloat(document.getElementById('foldProgress').value);
-            if(faces.right) faces.right.hinge.rotation.z = p * (Math.PI / 2);
-            if(faces.left)  faces.left.hinge.rotation.z = p * (-Math.PI / 2);
-            if(faces.front) faces.front.hinge.rotation.x = p * (-Math.PI / 2);
-            if(faces.back)  faces.back.hinge.rotation.x = p * (Math.PI / 2);
-            if(faces.top)   faces.top.hinge.rotation.z = p * (-Math.PI / 2);
+            // Gập về phía trước (trục Z dương)
+            if(faces.right)  faces.right.hinge.rotation.y = p * (-Math.PI / 2);
+            if(faces.left)   faces.left.hinge.rotation.y = p * (Math.PI / 2);
+            if(faces.top)    faces.top.hinge.rotation.x = p * (Math.PI / 2);
+            if(faces.bottom) faces.bottom.hinge.rotation.x = p * (-Math.PI / 2);
+            if(faces.front)  faces.front.hinge.rotation.y = p * (Math.PI / 2);
         }
 
         // ==========================================
-        // 4. AR GESTURES (PAN, ROTATE, ZOOM)
+        // 4. AR GESTURES
         // ==========================================
         let initialDist = 0, initialScale = 1;
         let prevX = 0, prevY = 0;
@@ -247,18 +288,23 @@
         window.addEventListener('touchend', () => { mode = 'none'; });
 
         // ==========================================
-        // 5. ENGINE
+        // 5. ENGINE & FIX MÀN HÌNH ĐEN 
         // ==========================================
         renderer.xr.addEventListener('sessionstart', () => {
-            document.body.classList.add('in-ar');
-            mainGroup.scale.setScalar(0.1); mainGroup.position.set(0, -0.5, -1.2);
+            scene.background = null; 
+            mainGroup.scale.setScalar(0.1); 
+            mainGroup.position.set(0, -0.2, -1);
             controls.enabled = false;
         });
 
         renderer.xr.addEventListener('sessionend', () => {
-            document.body.classList.remove('in-ar');
-            mainGroup.scale.setScalar(1); mainGroup.position.set(-1, -1, -2);
-            mainGroup.rotation.set(0, 0, 0); controls.enabled = true;
+            scene.background = new THREE.Color(0x1a1a1a);
+            
+            mainGroup.scale.setScalar(1); 
+            mainGroup.position.set(-1, -1, -2);
+            mainGroup.rotation.set(0, 0, 0); 
+            
+            controls.enabled = true;
         });
 
         ['sizeX', 'sizeY', 'sizeZ'].forEach(id => document.getElementById(id).oninput = (e) => {
@@ -268,11 +314,14 @@
         document.getElementById('foldProgress').oninput = applyFold;
 
         buildBox();
-        window.onresize = () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        };
+        
+        window.addEventListener('resize', () => {
+            if(!renderer.xr.isPresenting) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
 
         renderer.setAnimationLoop(() => {
             if(!renderer.xr.isPresenting) controls.update();
