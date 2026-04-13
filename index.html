@@ -1,12 +1,18 @@
-```html
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Pro - Bản lề chuẩn xác</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Hộp Gập - Tối Ưu Cảm Ứng</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #1a1a1a; }
+        /* touch-action: none; khóa cuộn trang mặc định của điện thoại để vuốt mô hình không bị khựng */
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: sans-serif; 
+            background-color: #1a1a1a; 
+            touch-action: none; 
+        }
         
         #ui-panel {
             position: absolute; top: 15px; right: 15px;
@@ -39,6 +45,7 @@
             color: white; background: rgba(0,0,0,0.6);
             padding: 12px; border-radius: 8px; font-size: 13px;
             pointer-events: none; line-height: 1.5;
+            z-index: 999;
         }
         body.in-ar #instruction { display: none; }
         body.in-ar { background-color: transparent !important; }
@@ -55,8 +62,11 @@
 <body>
 
     <div id="instruction">
-        👉 Máy tính: Chuột để xoay/zoom<br>
-        👉 AR: 1 ngón xoay, 2 ngón zoom
+        👉 Máy tính: Chuột để xoay/zoom/kéo<br>
+        👉 AR (Thực tế ảo): <br>
+        - 1 ngón: Di chuyển (Kéo)<br>
+        - 2 ngón (vuốt ngang): Xoay<br>
+        - 2 ngón (chụm/mở): Zoom
     </div>
 
     <div id="toggle-ui">Ẩn/Hiện Cài đặt</div>
@@ -89,9 +99,6 @@
         import { ARButton } from 'three/addons/webxr/ARButton.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // ==========================================
-        // 1. SETUP CORE
-        // ==========================================
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 100);
         
@@ -117,11 +124,11 @@
         scene.add(sun);
 
         const mainGroup = new THREE.Group();
-        mainGroup.position.set(-1, -1, -2); // Vị trí nhìn trên máy tính
+        mainGroup.position.set(-1, -1, -2);
         scene.add(mainGroup);
 
         // ==========================================
-        // 2. HỆ TRỤC & SỐ (-10 đến 10)
+        // HỆ TRỤC & SỐ ĐẾM
         // ==========================================
         function createAxis(color, pLen, nLen, axis) {
             const pts = [];
@@ -148,24 +155,23 @@
 
         for(let i=-10; i<=10; i++) {
             if(i===0) continue;
-            makeLabel(i, '#ffaaaa', i, -0.3, 0); // Trục X
-            makeLabel(i, '#aaaaff', 0, -0.3, i); // Trục Z
-            if(i>0) makeLabel(i, '#aaffaa', -0.4, i, 0); // Trục Y (chỉ dương)
+            makeLabel(i, '#ffaaaa', i, -0.3, 0); 
+            makeLabel(i, '#aaaaff', 0, -0.3, i); 
+            if(i>0) makeLabel(i, '#aaffaa', -0.4, i, 0); 
         }
 
         // ==========================================
-        // 3. MÔ HÌNH HỘP & BẢN LỀ CHUẨN XÁC
+        // MÔ HÌNH HỘP & BẢN LỀ (CROSS NET)
         // ==========================================
         const boxContainer = new THREE.Group();
         mainGroup.add(boxContainer);
         const faces = {}; 
 
-        // Hàm tạo mặt phẳng trải dài trên sàn (XZ Plane)
         function createFlatFace(width, depth, color) {
             const geom = new THREE.PlaneGeometry(width, depth);
             const mat = new THREE.MeshStandardMaterial({ color: color, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
             const mesh = new THREE.Mesh(geom, mat);
-            mesh.rotation.x = -Math.PI / 2; // Đặt phẳng xuống đất
+            mesh.rotation.x = -Math.PI / 2; 
             mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })));
             return mesh;
         }
@@ -177,52 +183,44 @@
             const Y = parseFloat(document.getElementById('sizeY').value);
             const Z = parseFloat(document.getElementById('sizeZ').value);
 
-            // Assembly giúp dời tâm hộp về (0,0,0) sao cho nó chỉ phát triển về hướng dương
             const assembly = new THREE.Group();
             assembly.position.set(X/2, 0, Z/2);
             boxContainer.add(assembly);
 
-            // 1. ĐÁY
             const bottom = createFlatFace(X, Z, 0x8B4513);
             assembly.add(bottom);
 
-            // 2. PHẢI
             faces.right = { hinge: new THREE.Group() };
             faces.right.hinge.position.set(X/2, 0, 0);
             const rightMesh = createFlatFace(Y, Z, 0xD2691E); rightMesh.position.set(Y/2, 0, 0);
             faces.right.hinge.add(rightMesh); assembly.add(faces.right.hinge);
 
-            // 3. TRÁI
             faces.left = { hinge: new THREE.Group() };
             faces.left.hinge.position.set(-X/2, 0, 0);
             const leftMesh = createFlatFace(Y, Z, 0xCD853F); leftMesh.position.set(-Y/2, 0, 0);
             faces.left.hinge.add(leftMesh); assembly.add(faces.left.hinge);
 
-            // 4. TRƯỚC (Gần Z dương)
             faces.front = { hinge: new THREE.Group() };
             faces.front.hinge.position.set(0, 0, Z/2);
             const frontMesh = createFlatFace(X, Y, 0xDAA520); frontMesh.position.set(0, 0, Y/2);
             faces.front.hinge.add(frontMesh); assembly.add(faces.front.hinge);
 
-            // 5. SAU (Z = 0)
             faces.back = { hinge: new THREE.Group() };
             faces.back.hinge.position.set(0, 0, -Z/2);
             const backMesh = createFlatFace(X, Y, 0xB8860B); backMesh.position.set(0, 0, -Y/2);
             faces.back.hinge.add(backMesh); assembly.add(faces.back.hinge);
 
-            // 6. TRÊN (NẮP) - Dính vào mặt trái
             faces.top = { hinge: new THREE.Group() };
-            faces.top.hinge.position.set(-Y, 0, 0); // Mép ngoài cùng của mặt trái
+            faces.top.hinge.position.set(-Y, 0, 0); 
             const topMesh = createFlatFace(X, Z, 0xF4A460); topMesh.position.set(-X/2, 0, 0);
             faces.top.hinge.add(topMesh); 
-            faces.left.hinge.add(faces.top.hinge); // Nối vào bản lề trái
+            faces.left.hinge.add(faces.top.hinge); 
 
             applyFold();
         }
 
         function applyFold() {
             const p = parseFloat(document.getElementById('foldProgress').value);
-            // p=0: góc=0 (trải phẳng), p=1: gập 90 độ (đóng hộp)
             if(faces.right) faces.right.hinge.rotation.z = p * (Math.PI / 2);
             if(faces.left)  faces.left.hinge.rotation.z = p * (-Math.PI / 2);
             if(faces.front) faces.front.hinge.rotation.x = p * (-Math.PI / 2);
@@ -231,45 +229,70 @@
         }
 
         // ==========================================
-        // 4. TƯƠNG TÁC AR (CHẠM & ZOOM)
+        // TƯƠNG TÁC AR TRÊN MÀN HÌNH CẢM ỨNG
         // ==========================================
         let initialDist = 0, initialScale = 1;
-        let isTouching = false, prevTouchX = 0;
+        let isTouching = false;
+        let prevTouchX = 0, prevTouchY = 0;
+        let touchMode = 'none'; 
 
         window.addEventListener('touchstart', (e) => {
+            if (!renderer.xr.isPresenting) return;
+            
             if (e.touches.length === 2) {
                 initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                 initialScale = mainGroup.scale.x;
-            } else if (e.touches.length === 1 && renderer.xr.isPresenting) {
-                // Chỉ nhận lướt tay xoay khi trong AR
-                isTouching = true;
+                prevTouchX = (e.touches[0].pageX + e.touches[1].pageX) / 2;
+                touchMode = 'zoom_or_rotate';
+            } else if (e.touches.length === 1) {
+                touchMode = 'pan';
                 prevTouchX = e.touches[0].pageX;
+                prevTouchY = e.touches[0].pageY;
             }
         });
 
         window.addEventListener('touchmove', (e) => {
-            if (e.touches.length === 2 && initialDist > 0) {
-                const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                const zoom = (dist / initialDist) * initialScale;
-                const finalZoom = Math.max(0.02, Math.min(zoom, 1)); // Zoom limit
-                mainGroup.scale.set(finalZoom, finalZoom, finalZoom);
-            } else if (e.touches.length === 1 && isTouching) {
+            if (!renderer.xr.isPresenting) return;
+
+            if (e.touches.length === 2 && touchMode === 'zoom_or_rotate') {
+                const currentDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                const currentMidX = (e.touches[0].pageX + e.touches[1].pageX) / 2;
+                
+                if (Math.abs(currentDist - initialDist) > 15) {
+                    const zoom = (currentDist / initialDist) * initialScale;
+                    const finalZoom = Math.max(0.02, Math.min(zoom, 1)); 
+                    mainGroup.scale.set(finalZoom, finalZoom, finalZoom);
+                } 
+                else if (Math.abs(currentMidX - prevTouchX) > 5) {
+                    const deltaX = currentMidX - prevTouchX;
+                    mainGroup.rotation.y += deltaX * 0.01;
+                    prevTouchX = currentMidX;
+                }
+            } else if (e.touches.length === 1 && touchMode === 'pan') {
                 const deltaX = e.touches[0].pageX - prevTouchX;
-                mainGroup.rotation.y += deltaX * 0.015; // Xoay khối
+                const deltaY = e.touches[0].pageY - prevTouchY;
+                
+                mainGroup.position.x += deltaX * 0.002;
+                mainGroup.position.y -= deltaY * 0.002; 
+                
                 prevTouchX = e.touches[0].pageX;
+                prevTouchY = e.touches[0].pageY;
             }
         });
 
-        window.addEventListener('touchend', () => { isTouching = false; initialDist = 0; });
+        window.addEventListener('touchend', () => { 
+            touchMode = 'none'; 
+            initialDist = 0; 
+        });
 
         // ==========================================
-        // 5. SỰ KIỆN GIAO DIỆN & AR STATE
+        // ĐỒNG BỘ TRẠNG THÁI AR & GIAO DIỆN
         // ==========================================
         renderer.xr.addEventListener('sessionstart', () => {
             document.body.classList.add('in-ar');
             mainGroup.scale.set(0.1, 0.1, 0.1); 
-            mainGroup.position.set(0, -0.5, -1.2); // Vị trí mô hình xuất hiện (trước mặt)
-            mainGroup.rotation.set(0, 0, 0); // Đặt lại góc quay
+            mainGroup.position.set(0, -0.5, -1.2); 
+            mainGroup.rotation.set(0, 0, 0); 
             controls.enabled = false;
         });
 
@@ -297,7 +320,6 @@
         }));
         document.getElementById('foldProgress').addEventListener('input', applyFold);
 
-        // Khởi tạo
         buildBox();
 
         window.addEventListener('resize', () => {
@@ -313,5 +335,3 @@
     </script>
 </body>
 </html>
-
-```
